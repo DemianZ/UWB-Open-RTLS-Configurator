@@ -1,12 +1,15 @@
 from fbs_runtime.application_context.PyQt5 import ApplicationContext
-from PyQt5.QtWidgets import QMainWindow
-
 import sys
 
+from design_components.MainWindow import MainWindow
+
+import logging as log
+log.basicConfig(level=log.DEBUG, format='%(levelname)s:\t%(message)s\t(%(filename)s|%(funcName)s)')
+
 if __name__ == '__main__':
-    appctxt = ApplicationContext()       # 1. Instantiate ApplicationContext
-    window = QMainWindow()
-    window.resize(250, 150)
+    app_context = ApplicationContext()       # 1. Instantiate ApplicationContext
+    window = MainWindow()
+    window.start_tasks()
     window.show()
-    exit_code = appctxt.app.exec_()      # 2. Invoke appctxt.app.exec_()
+    exit_code = app_context.app.exec_()      # 2. Invoke appctxt.app.exec_()
     sys.exit(exit_code)
