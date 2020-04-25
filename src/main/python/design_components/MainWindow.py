@@ -3,7 +3,8 @@ import platform
 from PyQt5.QtWidgets import *
 
 from designs.mainwindow_ui import Ui_MainWindow
-from modules.SerialTask import SerialTask
+from tasks.SerialTask import SerialTask
+from tasks.UDPServerTask import UdpServerTask
 
 
 class MainWindow(QMainWindow, Ui_MainWindow):
@@ -22,11 +23,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             # self.showMaximized()
 
         self.serial_task = SerialTask()
+        self.udp_task = UdpServerTask(self)
         self.connect_ui_slots()
         self.connect_signals()
 
     def start_tasks(self):
         self.serial_task.start()
+        self.udp_task.start()
 
     # @brief Connect MW ui slots
     def connect_ui_slots(self):

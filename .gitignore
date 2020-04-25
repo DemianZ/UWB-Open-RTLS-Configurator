@@ -2,3 +2,4 @@
 .idea/
 fbsenv/
 *.pyc
+logs/

@@ -12,7 +12,6 @@ class SerialTask(QThread):
 
     def __init__(self):
         QThread.__init__(self)
-
         atexit.register(self.terminate)  # function to be executed on exit
 
     # Task loop
