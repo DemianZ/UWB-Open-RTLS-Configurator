@@ -30,6 +30,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def start_tasks(self):
         self.serial_task.start()
         self.udp_task.start()
+        self.une_task.start()
 
     # @brief Connect MW ui signals
     def connect_ui_signals(self):

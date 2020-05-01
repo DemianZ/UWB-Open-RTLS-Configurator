@@ -6,11 +6,11 @@ from proto import Monitoring_pb2
 # Config logger to write to file
 logger = log.getLogger('data_log')
 logger.setLevel(log.DEBUG)
-fh = log.FileHandler('logs/pp_' + (datetime.datetime.now()).strftime("%d%m%Y%H%M%S") + '.log')
-fh.setLevel(log.DEBUG)
-formatter = log.Formatter('%(message)s\t%(asctime)s.%(msecs)03d', datefmt='%H:%M:%S')
-fh.setFormatter(formatter)
-logger.addHandler(fh)
+# fh = log.FileHandler('logs/pp_' + (datetime.datetime.now()).strftime("%d%m%Y%H%M%S") + '.log')
+# fh.setLevel(log.DEBUG)
+# formatter = log.Formatter('%(message)s\t%(asctime)s.%(msecs)03d', datefmt='%H:%M:%S')
+# fh.setFormatter(formatter)
+# logger.addHandler(fh)
 
 
 class Posit:
