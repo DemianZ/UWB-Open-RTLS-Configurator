@@ -38,6 +38,7 @@ class UdpServerTask(QThread):
             self.sock.bind((ip, port))
         except OSError as e:
             if e.errno == 49:
-                log.error("ERRNO: " + str(e.errno) + " ERRSTR: " + e.strerror)
+                # log.debug("ERRNO_" + str(e.errno) + " -> " + e.strerror)
+                pass
             return False
         return True
