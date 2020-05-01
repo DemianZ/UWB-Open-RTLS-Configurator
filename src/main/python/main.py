@@ -5,9 +5,11 @@ from design_components.MainWindow import MainWindow
 
 import logging as log
 
+
 log.basicConfig(level=log.DEBUG,
                 format='%(levelname)s:\t%(message)s\t(%(filename)s|%(funcName)s|%(asctime)s.%(msecs)03d)',
                 datefmt='%H:%M:%S')
+log.getLogger('matplotlib.font_manager').disabled = True
 
 if __name__ == '__main__':
     app_context = ApplicationContext()       # 1. Instantiate ApplicationContext

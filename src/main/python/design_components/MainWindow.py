@@ -5,6 +5,7 @@ from PyQt5.QtWidgets import *
 from designs.mainwindow_ui import Ui_MainWindow
 from tasks.SerialTask import SerialTask
 from tasks.UDPServerTask import UdpServerTask
+from tasks.UneTwrTask import UneTwrTask, UneNavMethod
 
 
 class MainWindow(QMainWindow, Ui_MainWindow):
@@ -24,13 +25,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         self.serial_task = SerialTask()
         self.udp_task = UdpServerTask(self)
+        self.twr_task = UneTwrTask(UneNavMethod.lse)
         self.connect_ui_signals()
         self.connect_external_signals()
 
     def start_tasks(self):
         self.serial_task.start()
         self.udp_task.start()
-        self.une_task.start()
+        self.twr_task.start()
 
     # @brief Connect MW ui signals
     def connect_ui_signals(self):

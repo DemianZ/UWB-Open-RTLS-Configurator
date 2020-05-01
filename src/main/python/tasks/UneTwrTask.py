@@ -25,7 +25,7 @@ class UneNavMethod(Enum):
     kalman = 3
 
 
-class UneTwr(QThread):
+class UneTwrTask(QThread):
     """Documentation for a class.
 
     More details.
@@ -109,7 +109,7 @@ class UneTwr(QThread):
         """
 
         # Load data for postprocessing
-        with open("logs\\my_new_log.json", "r") as read_file:
+        with open("logs/my_new_log.json", "r") as read_file:
             desc_meas = json.load(read_file)
 
         # Add all available anchors and their positions
