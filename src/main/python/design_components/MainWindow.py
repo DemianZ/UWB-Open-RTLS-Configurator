@@ -25,14 +25,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         self.serial_task = SerialTask()
         self.udp_task = UdpServerTask(self)
-        # self.une_task = UneTwr(UneNavMethod.lse)
+        self.une_task = UneTwr(UneNavMethod.lse)
         self.connect_ui_slots()
         self.connect_signals()
 
     def start_tasks(self):
         self.serial_task.start()
         self.udp_task.start()
-        # self.une_task.start()
+        self.une_task.start()
 
     # @brief Connect MW ui slots
     def connect_ui_slots(self):
