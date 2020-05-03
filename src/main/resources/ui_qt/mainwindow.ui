@@ -37,7 +37,7 @@
    </property>
    <layout class="QVBoxLayout" name="verticalLayout_2">
     <item>
-     <layout class="QVBoxLayout" name="verticalLayout_network" stretch="4,3">
+     <layout class="QVBoxLayout" name="verticalLayout_network" stretch="4,4">
       <item>
        <widget class="QGroupBox" name="groupBox_network">
         <property name="sizePolicy">
@@ -46,12 +46,22 @@
           <verstretch>1</verstretch>
          </sizepolicy>
         </property>
+        <property name="font">
+         <font>
+          <pointsize>12</pointsize>
+         </font>
+        </property>
         <property name="title">
          <string>RTLS Network</string>
         </property>
         <layout class="QHBoxLayout" name="horizontalLayout_2" stretch="1,5,4">
          <item>
           <widget class="QGroupBox" name="groupBox">
+           <property name="font">
+            <font>
+             <pointsize>12</pointsize>
+            </font>
+           </property>
            <property name="title">
             <string>Device configuration</string>
            </property>
@@ -81,6 +91,11 @@
          </item>
          <item>
           <widget class="QGroupBox" name="groupBox_devileList">
+           <property name="font">
+            <font>
+             <pointsize>12</pointsize>
+            </font>
+           </property>
            <property name="title">
             <string>Device List</string>
            </property>
@@ -109,7 +124,7 @@
                <bool>true</bool>
               </attribute>
               <attribute name="horizontalHeaderDefaultSectionSize">
-               <number>79</number>
+               <number>76</number>
               </attribute>
               <attribute name="horizontalHeaderStretchLastSection">
                <bool>true</bool>
@@ -151,6 +166,11 @@
          </item>
          <item>
           <widget class="QGroupBox" name="groupBox_une">
+           <property name="font">
+            <font>
+             <pointsize>12</pointsize>
+            </font>
+           </property>
            <property name="title">
             <string>UNE</string>
            </property>
@@ -165,14 +185,19 @@
        </widget>
       </item>
       <item>
-       <layout class="QHBoxLayout" name="horizontalLayout_serial" stretch="2,5,5">
+       <layout class="QHBoxLayout" name="horizontalLayout_serial" stretch="0,5,5">
         <item>
          <widget class="QGroupBox" name="groupBox_serial">
           <property name="sizePolicy">
-           <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-            <horstretch>1</horstretch>
+           <sizepolicy hsizetype="Fixed" vsizetype="Expanding">
+            <horstretch>0</horstretch>
             <verstretch>0</verstretch>
            </sizepolicy>
+          </property>
+          <property name="font">
+           <font>
+            <pointsize>12</pointsize>
+           </font>
           </property>
           <property name="title">
            <string>Serial Port</string>
@@ -186,11 +211,13 @@
                <verstretch>0</verstretch>
               </sizepolicy>
              </property>
+             <property name="font">
+              <font>
+               <pointsize>12</pointsize>
+              </font>
+             </property>
              <property name="title">
               <string>Choose port</string>
-             </property>
-             <property name="alignment">
-              <set>Qt::AlignCenter</set>
              </property>
              <layout class="QVBoxLayout" name="verticalLayout_4">
               <item>
@@ -237,6 +264,66 @@
             </widget>
            </item>
            <item>
+            <widget class="QGroupBox" name="groupBox_2">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="minimumSize">
+              <size>
+               <width>180</width>
+               <height>0</height>
+              </size>
+             </property>
+             <property name="maximumSize">
+              <size>
+               <width>180</width>
+               <height>16777215</height>
+              </size>
+             </property>
+             <property name="font">
+              <font>
+               <pointsize>12</pointsize>
+              </font>
+             </property>
+             <property name="title">
+              <string>Status</string>
+             </property>
+             <layout class="QHBoxLayout" name="horizontalLayout">
+              <item>
+               <widget class="QLabel" name="label_serialStatus">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="minimumSize">
+                 <size>
+                  <width>130</width>
+                  <height>0</height>
+                 </size>
+                </property>
+                <property name="font">
+                 <font>
+                  <pointsize>10</pointsize>
+                  <kerning>false</kerning>
+                 </font>
+                </property>
+                <property name="text">
+                 <string>No device found.</string>
+                </property>
+                <property name="textFormat">
+                 <enum>Qt::AutoText</enum>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
             <spacer name="verticalSpacer">
              <property name="orientation">
               <enum>Qt::Vertical</enum>
@@ -254,6 +341,11 @@
         </item>
         <item>
          <widget class="QGroupBox" name="groupBox_config">
+          <property name="font">
+           <font>
+            <pointsize>12</pointsize>
+           </font>
+          </property>
           <property name="title">
            <string>Configuration</string>
           </property>
@@ -262,6 +354,12 @@
             <widget class="QTableWidget" name="tableWidget_config">
              <property name="sizeAdjustPolicy">
               <enum>QAbstractScrollArea::AdjustIgnored</enum>
+             </property>
+             <property name="editTriggers">
+              <set>QAbstractItemView::DoubleClicked</set>
+             </property>
+             <property name="alternatingRowColors">
+              <bool>true</bool>
              </property>
              <property name="sortingEnabled">
               <bool>true</bool>
@@ -276,7 +374,7 @@
               <bool>false</bool>
              </attribute>
              <attribute name="horizontalHeaderDefaultSectionSize">
-              <number>210</number>
+              <number>205</number>
              </attribute>
              <attribute name="horizontalHeaderHighlightSections">
               <bool>true</bool>
@@ -297,25 +395,25 @@
             </widget>
            </item>
            <item>
-            <layout class="QHBoxLayout" name="horizontalLayout_configButtons">
-             <item>
+            <layout class="QGridLayout" name="gridLayout">
+             <item row="0" column="0">
               <widget class="QPushButton" name="pushButton_rdConfig">
                <property name="text">
                 <string>Read</string>
                </property>
               </widget>
              </item>
-             <item>
-              <widget class="QPushButton" name="pushButton_resetConfig">
-               <property name="text">
-                <string>Reset</string>
-               </property>
-              </widget>
-             </item>
-             <item>
+             <item row="0" column="1">
               <widget class="QPushButton" name="pushButton_wrConfig">
                <property name="text">
                 <string>Write</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="2">
+              <widget class="QPushButton" name="pushButton_defConfig">
+               <property name="text">
+                <string>Reset to default settings</string>
                </property>
               </widget>
              </item>
@@ -332,6 +430,11 @@
             <verstretch>0</verstretch>
            </sizepolicy>
           </property>
+          <property name="font">
+           <font>
+            <pointsize>12</pointsize>
+           </font>
+          </property>
           <property name="title">
            <string>Console Log</string>
           </property>
@@ -347,8 +450,28 @@
                <verstretch>0</verstretch>
               </sizepolicy>
              </property>
+             <property name="font">
+              <font>
+               <pointsize>12</pointsize>
+              </font>
+             </property>
+             <property name="acceptDrops">
+              <bool>false</bool>
+             </property>
+             <property name="accessibleName">
+              <string/>
+             </property>
+             <property name="autoFormatting">
+              <set>QTextEdit::AutoNone</set>
+             </property>
              <property name="readOnly">
               <bool>true</bool>
+             </property>
+             <property name="textInteractionFlags">
+              <set>Qt::TextSelectableByMouse</set>
+             </property>
+             <property name="openLinks">
+              <bool>false</bool>
              </property>
             </widget>
            </item>

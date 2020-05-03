@@ -21,6 +21,16 @@ class Wake:
 
     CRC16_POLY = 0x1021
 
+    CMD_I_AM_HERE_REQ = 0x80
+    CMD_I_AM_HERE_RESP = 0x81
+    CMD_GET_SETTINGS_REQ = 0x11
+    CMD_GET_SETTINGS_RESP = 0x12
+    CMD_SET_SETTINGS_REQ = 0x13
+    CMD_SET_SETTINGS_RESP = 0x14
+    CMD_SET_DEF_SETTINGS_REQ = 0x15
+    CMD_SET_DEF_SETTINGS_RESP = 0x16
+    CMD_TWR_RANGING = 0x21
+
     def __init__(self):
         self.len = 0
         self.sta = 0
@@ -38,7 +48,7 @@ class Wake:
         crc ^= byte << 8
         for index in range(0, 8):
             if crc & 0x8000:
-                crc = (crc << 1) ^ CRC16_POLY
+                crc = (crc << 1) ^ Wake.CRC16_POLY
             else:
                 crc = crc << 1
             crc &= 0xFFFF
@@ -63,7 +73,7 @@ class Wake:
     def prepare(self, cmd, data):
         out = []
         # start
-        crc16 = self.do_crc16(0xFFFF, FEND)
+        crc16 = self.do_crc16(0xFFFF, Wake.FEND)
         out.append(Wake.FEND)
         # cmd
         tmp = cmd & 0x7F
@@ -142,8 +152,12 @@ class Wake:
                 self.dbuf.append(byte)
                 self.crc = self.do_crc16(self.crc, byte)
                 return Wake.WAKE_PROCESS
-        self.sta = Wake.WAIT_CRC1
-        if x == Wake.WAIT_CRC1:
+            self.sta = Wake.WAIT_CRC1
+            self.crc_pack = byte
+            self.sta = Wake.WAIT_CRC2
+            return Wake.WAKE_PROCESS
+
+        elif x == Wake.WAIT_CRC1:
             self.crc_pack = byte
             self.sta = Wake.WAIT_CRC2
             return Wake.WAKE_PROCESS
