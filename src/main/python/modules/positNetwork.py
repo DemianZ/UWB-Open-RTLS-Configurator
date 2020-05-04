@@ -15,35 +15,41 @@ logger.setLevel(log.DEBUG)
 # logger.addHandler(fh)
 
 
-class Posit(QObject):
+class PositNetwork(QObject):
 
     PB_TWR_MSGTYPE_NONE = 0
-    PB_TWR_MSGTYPE_RANGING = 1
+    PB_TWR_MSGTYPE_TWR = 1
 
-    sig_posit_settings_received = pyqtSignal(dict, name='Posit_SettingsReceived')
+    sig_posit_settings_received = pyqtSignal(dict, name='PositNetwork_SettingsReceived')
+    sig_posit_hello_received = pyqtSignal(dict, name='PositNetwork_HelloReceived')
 
     def __init__(self):
         super().__init__()
         self.monitoring = Monitoring_pb2.Monitoring()
         self.settings = Settings_pb2.Settings()
-        pass
+        self.client_list = list()
 
-    def rx_callback(self, cmd, data):
+    def rx_callback(self, ip, cmd, data):
         if cmd == Wake.CMD_GET_SETTINGS_RESP:
-            self.get_settings_callback(data)
+            return self.get_settings_callback(ip, data)
         if cmd == Wake.CMD_TWR_RANGING:
-            self.twr_ranging_callback(data)
+            return self.twr_ranging_callback(data)
         else:
-            pass
+            return False
 
-    def get_settings_callback(self, data):
+    def hello_callback(self):
+        self.sig_posit_hello_received.emit()
+        return True
+
+    def get_settings_callback(self, ip, data):
         try:
             self.settings.ParseFromString(bytes(data))
         except Exception as e:
             return e
         settings_dict = MessageToDict(self.settings)
         logger.debug('dev_settings:\n' + str(self.settings))
-        self.sig_posit_settings_received.emit(settings_dict)
+        self.sig_posit_hello_received.emit(settings_dict)
+        return True
 
     def twr_ranging_callback(self, data):
         try:
@@ -51,5 +57,14 @@ class Posit(QObject):
         except Exception as e:
             return e
 
-        if self.monitoring.twr_message_type == Posit.PB_TWR_MSGTYPE_RANGING:
-            logger.debug('twr_ranging_dist:\t' + str(self.monitoring.twr_distance))
+        if self.monitoring.TWR.MessageType == PositNetwork.PB_TWR_MSGTYPE_TWR:
+            logger.debug('Net Ranging:\t' + str(self.monitoring.TWR.Distance))
+        return True
+
+    def check_new_client(self, ip):
+        if len(self.client_list):
+            for client in self.client_list:
+                if client == ip:
+                    return False
+        self.client_list.append(ip)
+        return True

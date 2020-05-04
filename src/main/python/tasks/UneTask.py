@@ -269,15 +269,15 @@ class UneTag:
 
     def tic(self):
         """ Method to start meas time of computation of PVT """
-        self.m_time_for_compute = time.time()
+        self.m_time_for_compute = time.time_ns()
 
     def toc(self):
         """ Method to stop meas time of computation of PVT.
             Return time in ms
         """
-        self.m_time_for_compute = time.time() - self.m_time_for_compute
+        self.m_time_for_compute = time.time_ns() - self.m_time_for_compute
 
-        return self.m_time_for_compute * 1000.0
+        return self.m_time_for_compute / 1000.0
 
 
 class Une:
@@ -362,7 +362,8 @@ class Une:
                 elif self.m_nav_method == UneNavMethod.Kalman:
                     self.get_position_kalman(tag)
 
-                print('Computation time of the PVT for tag: {} is equal {:5.3f} ms'.format(tag.get_name(), tag.toc()))
+                toc_t = tag.toc()
+                print('Computation time of the PVT for tag: {} is equal {:5.3f} ms'.format(tag.get_name(), toc_t))
 
                 # Clear tag measurements
                 tag.clr_meas()
@@ -382,7 +383,7 @@ class Une:
         flg_stop_computation = False
 
         if num_anchors < UneConstant.meas_min_const():
-            print("-E-: [UneTwr::get_position_lse] Not enough anchors for tag: {}".format(tag.get_name()))
+            # print("-E-: [UneTwr::get_position_lse] Not enough anchors for tag: {}".format(tag.get_name()))
             tag.set_pvt(0, 0, 0)
             tag.set_err_code(UneErrors.not_enough_meas)
             return
@@ -481,7 +482,7 @@ class Une:
             tag.set_int_flags(UneFlags.new_pvt_is_ready, True)
             tag.set_err_code(UneErrors.none)
         else:
-            print("-E-: [Une::get_position_lse] Too many iteration for tag {}".format(tag.get_name()))
+            # print("-E-: [Une::get_position_lse] Too many iteration for tag {}".format(tag.get_name()))
             # pos = ...
             tag.set_err_code(UneErrors.too_many_iteration)
 

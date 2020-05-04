@@ -6,7 +6,7 @@ import serial
 import json
 import serial.tools.list_ports
 from modules.wake import Wake
-from modules.posit import Posit
+from modules.positSerial import PositSerial
 from proto import Settings_pb2
 from google.protobuf.json_format import Parse, ParseDict
 
@@ -25,7 +25,7 @@ class SerialTask(QThread):
         self.com_port = None
         self.connected = None
         self.wake = Wake()
-        self.posit = Posit()
+        self.posit = PositSerial()
         atexit.register(self.terminate)  # function to be executed on exit
 
     # Task loop

@@ -9,13 +9,14 @@ from tasks.SerialTask import SerialTask
 from tasks.UDPServerTask import UdpServerTask
 from tasks.UneTask import UneTask, UneNavMethod
 
+from modules.mpl import MplCanvas, MplWidget
+
+# from matplotlib.backends.backend_qt5agg import (
+#         FigureCanvas, NavigationToolbar2QT as NavigationToolbar)
+
 
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self):
-        """
-        Call attribute class constructors,
-        connect stop/start buttons with signals
-        """
         super().__init__()
         self.setupUi(self)
         if platform.system() == 'Linux':
@@ -32,10 +33,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.connect_ui_signals()
         self.connect_external_signals()
 
+        # init mpl
+        self.mpl_layout = QVBoxLayout(self.widget_mpl)
+        self._widget_mpl = MplWidget(self.widget_mpl)
+        self.mpl_canvas = MplCanvas()
+        self.mpl_layout.addWidget(self.mpl_canvas)
+        # self.mpl_toolbar = NavigationToolbar(self.mpl_canvas, self)
+        # self.mpl_layout.addWidget(self.mpl_toolbar)
+
     def start_tasks(self):
         self.serial_task.start()
         self.udp_task.start()
-        self.une_task.start()
+        # self.une_task.start()
 
     # @brief Connect MW ui signals
     def connect_ui_signals(self):
@@ -43,6 +52,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.comboBox_port.currentIndexChanged.connect(lambda:
                                                        self.serial_task.port_changed(self.comboBox_port.currentIndex()))
         self.pushButton_connect.clicked.connect(self.serial_task.open_port)
+        self.pushButton_disconnect.clicked.connect(self.serial_task.close_port)
         self.pushButton_rdConfig.clicked.connect(self.serial_task.get_settings)
         self.pushButton_wrConfig.clicked.connect(lambda:
                                                  self.serial_task.set_settings(self.get_settings_table_data()))
@@ -55,6 +65,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.serial_task.posit.sig_posit_settings_received.connect(lambda sets: self.serial_received_settings(sets))
         self.serial_task.sig_status_changed.connect(lambda st: self.serial_status_changed(st))
         self.serial_task.sig_add_console_logs.connect(lambda text, color: self.add_console_logs(text, color))
+
+        self.udp_task.posit.sig_posit_hello_received.connect(lambda sets: self.serial_received_settings(sets))
 
     # @brief Refresh ports at choose port combo-box
     def add_ports(self, ports):
@@ -73,8 +85,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             item_value = QTableWidgetItem(str(value))
             self.tableWidget_config.setItem(row_position, 0, item_name)
             self.tableWidget_config.setItem(row_position, 1, item_value)
-
-        pass
 
     def serial_status_changed(self, st):
         self.label_serialStatus.setText(st)

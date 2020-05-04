@@ -2,11 +2,10 @@ from PyQt5.QtCore import QThread
 import atexit
 import socket
 import logging as log
-from modules.posit import Posit
+from modules.positNetwork import PositNetwork
 from modules.wake import Wake
 
 UDP_SRV = "10.90.90.99"     # Your PC's IP
-UDP_CLIENT = "10.90.0.1"    # Device IP
 UDP_PORT = 30005
 
 
@@ -18,9 +17,10 @@ class UdpServerTask(QThread):
         self.ui = ui
         self.sock = None
         self.ip = UDP_SRV
-        self.client_ip = UDP_CLIENT
         self.port = UDP_PORT
         self.wake = Wake()
+        self.posit = PositNetwork()
+        self.client_list = list()   # ip addresses
 
     # Task loop
     def run(self):
@@ -32,12 +32,16 @@ class UdpServerTask(QThread):
 
         while True:
             data, address = self.sock.recvfrom(1024)  # buffer size is 1024 bytes
+            ip = address[0]
             if len(data):
                 cmd_res = self.wake.process(data)
                 if cmd_res is not None:
                     log.debug('CMD_' + str(hex(cmd_res['cmd'])) +
                               ' DATA: ' + str(' '.join('{:02X}'.format(c) for c in cmd_res['data'])))
-                    Posit.rx_callback(cmd_res['cmd'], cmd_res['data'])
+                    if self.posit.rx_callback(address, cmd_res['cmd'], cmd_res['data']) is True:
+                        if self.posit.check_new_client(ip) is True:
+                            self.get_settings(ip)
+
             self.usleep(50)
 
     def bind_port(self, ip, port):
@@ -49,3 +53,8 @@ class UdpServerTask(QThread):
                 pass
             return False
         return True
+
+    def get_settings(self, ip):
+        buf = self.wake.prepare(Wake.CMD_GET_SETTINGS_REQ, [])
+        self.sock.sendto(bytearray(buf), (ip, UDP_PORT))
+
