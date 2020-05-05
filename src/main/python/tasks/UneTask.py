@@ -18,7 +18,7 @@ algorithms to control integrity and fault detection such as RAIM/FDE, to estimat
 computation has performed for all tags.
 """
 
-from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt5.QtCore import QObject, QThread, pyqtSignal, pyqtSlot
 import atexit
 import logging as log
 from enum import Enum
@@ -27,6 +27,7 @@ import json
 import numpy as np
 import matplotlib.pyplot as plt
 from numpy.linalg import inv
+import math
 
 
 class UneConstant:
@@ -39,7 +40,7 @@ class UneConstant:
         """ Method for implementing constant value
             of epoch period in seconds
         """
-        return 0.1
+        return 0.005
 
     @staticmethod
     def meas_min_const():
@@ -59,8 +60,8 @@ class UneConstant:
 
 class UneErrors(Enum):
     """ Enumerator class describing errors in the UNE module """
-    none = 0
-    not_enough_meas = 1
+    none               = 0
+    not_enough_meas    = 1
     too_many_iteration = 2
 
 
@@ -89,8 +90,8 @@ class UneTag:
     m_pvt_prev  = [0, 0, 0]       # Previous tag Position/Velocity/Time
     m_pvt_curr  = [0, 0, 0]       # Current tag Position/Velocity/Time
     m_residuals = list()          # Residual vector
-    m_meas_prev = dict()          # Previous epoch measurements between tag and anchors -> dictionary {name: [distance, snr, ...], ...}
-    m_meas_curr = dict()          # Current epoch measurements between tag and anchors -> dictionary {name: [distance, snr, ...], ...}
+    m_meas_prev = dict()          # Previous epoch measurements between tag and anchors
+    m_meas_curr = dict()          # Current epoch measurements between tag and anchors
     m_anchors   = dict()          # Anchors for this tag -> dictionary {name: [x, y, z], ...}
     m_err_code  = UneErrors.none  # Error code
     m_time_for_compute = 0        # To meas time that is required for compute PVT
@@ -150,7 +151,7 @@ class UneTag:
         return
 
     def set_dops(self, h=100, v=100, p=100):
-        """ Set DOP factors """
+        """ Set DOP factors: HDOP, VDOP, PDOP """
         self.m_hdop = h
         self.m_vdop = v
         self.m_pdop = p
@@ -255,17 +256,13 @@ class UneTag:
 
     def get_pos_and_dist(self, key, p2):
         """ Get position of anchor by key and distance between anchor and point [x, y, z] """
-        p1 = [
-            self.m_anchors[key][self.m_X],
-            self.m_anchors[key][self.m_Y],
-            self.m_anchors[key][self.m_Z]
-        ]
+        p1 = self.m_anchors.get(key)
 
-        dX = p1[self.m_X] - p2[self.m_X]
-        dY = p1[self.m_Y] - p2[self.m_Y]
-        dZ = p1[self.m_Z] - p2[self.m_Z]
+        dX = p1[0] - p2[0]
+        dY = p1[1] - p2[1]
+        dZ = p1[2] - p2[2]
 
-        return [dX, dY, dZ, self.get_dist(p1, p2)]
+        return [dX, dY, dZ, math.sqrt(dX ** 2 + dY ** 2 + dZ ** 2)]
 
     def tic(self):
         """ Method to start meas time of computation of PVT """
@@ -313,23 +310,24 @@ class Une:
         """
         self.m_nav_method = nav_method
 
-    def add_tag(self, name):
+    def add_tag(self, tag_new):
         """ Method to add new tag """
         for tag in self.m_tags:
-            if name == tag.get_name():
-                print('-W- [Une::add_new_tag] Tag {} has already added'.format(name))
-                return
+            if tag_new.get_name() == tag.get_name():
+                print('-W- [Une::add_new_tag] Tag {} has already added'.format(tag_new.get_name()))
+                return -1
 
-        self.m_tags.append(UneTag(name))
+        self.m_tags.append(tag_new)
 
         # Return current tag object
-        return self.m_tags[-1]
+        return 0
 
     def get_tag(self, name):
         """ Method to get one tag object """
         for tag in self.m_tags:
             if name == tag.get_name():
                 return tag
+        return None
 
     def get_tags(self):
         """ Method to get tags list """
@@ -353,7 +351,7 @@ class Une:
             # If need to compute new tag position
             if tag.get_flags(UneFlags.get_new_pvt) is True:
 
-                tag.tic()
+                # tag.tic()
 
                 if self.m_nav_method == UneNavMethod.lse:
                     self.get_position_lse(tag)
@@ -403,32 +401,39 @@ class Une:
         # Residual vector
         mtx_r = np.zeros(num_anchors)
 
-        # Matrix to compute DOPs
-        mtx_q = []
+        # Matrices to compute DOPs and auxiliary matrix
+        mtx_q = np.zeros((3, 3))
+        mtx_s = np.zeros((3, num_anchors))
 
         # Iterative (9 attempts maximum recommended) computation of tag position by using LSE method
         while (num_max_iteration > 0) and (flg_stop_computation is False):
 
-            # Allocate memory for matrices
-            mtx_g = np.zeros((num_anchors, 3))
-            mtx_y = np.zeros(num_anchors)
+            # Clear matrices
+            mtx_g.fill(0)
+            mtx_y.fill(0)
+            mtx_q.fill(0)
+            mtx_s.fill(0)
 
             num_max_iteration -= 1
 
             # Get tag position got on the previous step
             tag_pos_prev = tag.get_pvt()
 
+            m_anchors_n = tag.get_anchors().keys()
+            m_anchors_p = list()
+
             cnt_meas = 0
             for a_name, a_meas in meas_curr:
+
+                tag.tic()
 
                 # Get distance between anchor and tag position for previous computation step
                 [x, y, z, d_prev] = tag.get_pos_and_dist(a_name, tag_pos_prev)
 
-                # Get distances between anchors and tag position for current epoch
-                d_curr = a_meas[self.m_ind_dist]
+                print('Computation time of the PVT for tag: {} is equal {:5.3f} ms'.format(tag.get_name(), tag.toc()))
 
                 # Get difference between previous and current distances to compute error in current user position
-                d_err = d_prev - d_curr
+                d_err = d_prev - a_meas[0]
 
                 # Filling geometry and measurements matrices to
                 # compute user position and time state vector [dx, dy, dz]
@@ -474,8 +479,10 @@ class Une:
         tag.set_residuals(mtx_r)
 
         # Get DOP factors
-        pdop = mtx_q.trace()
-        tag.set_dops(100, 100, pdop)
+        p_dop = mtx_q.trace()
+        h_dop = math.sqrt(mtx_q[0][0] ** 2 + mtx_q[1][1] ** 2)
+        v_dop = math.sqrt(mtx_q[2][2] ** 2)
+        tag.set_dops(h_dop, v_dop, p_dop)
 
         # If tag position was successfully computed
         if flg_stop_computation is True:
@@ -522,11 +529,15 @@ class UneTask(QThread):
 
         More details.
     """
-    # !!! For test
-    m_pp_meas = dict()
+    # Define API signals
+    # This defines a signal that takes one argument: dictionary -> { 'tag name' : [err_code, x, y, z], ... }
+    api_sig_new_pvt = pyqtSignal([dict])
 
     # UWB Navigation Engine object
     une = None
+
+    # !!! For test
+    m_pp_meas = dict()
 
     def __init__(self, nav_method):
         """ The constructor.
@@ -543,10 +554,18 @@ class UneTask(QThread):
         """ Documentation for a method
             ..........................
         """
-
-        my_tag = self.une.add_tag('My tag')
+        # t = time.time()
+        # while True:
+        #     if time.time() - t > UneConstant.epoch_period_const():
+        #         t = time.time()
+        #
+        #         # Compute position
+        #         self.une.get_position()
 
         # !!! For test. Adding anchors for this tag
+        my_tag = UneTag('My tag')
+
+        self.une.add_tag(my_tag)
         self.prepare_data(my_tag)
         x, y, z = [], [], []
         flg_compute = True
@@ -591,52 +610,6 @@ class UneTask(QThread):
 
             time.sleep(30)
 
-        # t = time.time()
-        # while True:
-        #     if time.time() - t > UneConstant.epoch_period_const():
-        #         t = time.time()
-        #
-        #         # Compute position
-        #         self.une.get_position()
-
-        # x, y, z = [], [], []
-        # flg_compute = True
-        # while True:
-        #     if flg_compute is True:
-        #
-        #         flg_compute = False
-        #
-        #         for epoch in self.m_pp_meas:
-        #             print('-I- [UneTwr::run] Compute tag PVT. UTC:', epoch)
-        #
-        #             # Forming tag measurement dictionary for current epoch
-        #             self.clr_tag_meas()
-        #             for a_name, a_meas in self.m_pp_meas[epoch].items():
-        #                 dist = a_meas[self.m_ind_dist]
-        #                 cnr = a_meas[self.m_ind_cnr]
-        #                 self.add_tag_meas(a_name, dist, cnr)
-        #
-        #             res = [0, 0, 0]
-        #             err_code = self.get_position(res)
-        #             x.append(res[0])
-        #             y.append(res[1])
-        #             z.append(res[2])
-        #
-        #             time.sleep(0.05)
-        #
-        #         fig = plt.figure()
-        #         ax = fig.add_subplot(111, projection='3d')
-        #         ax.plot_wireframe(x, y, np.array([z, z]), rstride=10, cstride=10)
-        #         ax.set_xlim3d(min(x) - 2, max(x) + 2)
-        #         ax.set_ylim3d(min(y) - 2, max(y) + 2)
-        #         ax.set_zlim3d(min(z) - 2, max(z) + 2)
-        #         ax.set_xlabel('X axis, m')
-        #         ax.set_ylabel('Y axis, m')
-        #         ax.set_zlabel('Z axis, m')
-        #         plt.show()
-        #
-        #     time.sleep(30)
-
     def prepare_data(self, tag):
         """ !!! Test method. Delete later.
             Load description and measurements from JSON file
@@ -657,3 +630,25 @@ class UneTask(QThread):
 
         # Fill all measurements dictionary
         self.m_pp_meas = desc_meas['measurements']
+
+    @pyqtSlot(UneTag)
+    def api_slot_add_tag(self, tag):
+        """ Slot method to add new tag in UNE.
+            If tag exist then do nothing.
+        """
+        self.une.add_tag(tag)
+
+    @pyqtSlot(str, dict)
+    def api_slot_tag_upd_meas(self, tag_name, meas):
+        """ Slot method to add tag measurements.
+            If tag doesn't exist then do nothing.
+        """
+        tag = self.une.get_tag(tag_name)
+
+        if tag is not None:
+            # Add measurements
+            for a_name, m_list in meas.items():
+                tag.add_meas(a_name, m_list[0], m_list[1])
+
+            # Set flag to start computation of the PVT
+            tag.set_flags(UneFlags.get_new_pvt, True)
