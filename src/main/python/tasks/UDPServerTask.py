@@ -9,6 +9,7 @@ UDP_SRV = "10.90.90.99"     # Your PC's IP
 UDP_PORT = 30005
 
 
+# @brief:   USP server task for network communication with RTLS nodes
 class UdpServerTask(QThread):
     def __init__(self, ui):
         QThread.__init__(self)
@@ -38,11 +39,14 @@ class UdpServerTask(QThread):
                 if cmd_res is not None:
                     log.debug('CMD_' + str(hex(cmd_res['cmd'])) +
                               ' DATA: ' + str(' '.join('{:02X}'.format(c) for c in cmd_res['data'])))
-                    if self.posit.rx_callback(address, cmd_res['cmd'], cmd_res['data']) is True:
+                    if self.posit.rx_callback(ip, cmd_res['cmd'], cmd_res['data']) is True:
                         if self.posit.check_new_client(ip) is True:
                             self.get_settings(ip)
 
-            self.usleep(50)
+            self.usleep(100)
+
+    def stop(self):
+        self.quit()
 
     def bind_port(self, ip, port):
         try:

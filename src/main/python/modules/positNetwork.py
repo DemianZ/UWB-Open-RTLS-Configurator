@@ -15,56 +15,61 @@ logger.setLevel(log.DEBUG)
 # logger.addHandler(fh)
 
 
+#
+# @brief:
+#   Class for handling incoming packets from server clients
+# @classSignals:
+#   PositNetwork_CmdHello:          args: str (ip)
+#   PositNetwork_CmdGetSettings:    args: list [ip, {settings}]
+#   PositNetwork_CmdSetSettings:    args: str (ip)
+#   PositNetwork_CmdTwrRanging:     args: list [ip, {monitoring}]
+#
 class PositNetwork(QObject):
+    sig_cmd_hello = pyqtSignal(str, name='PositNetwork_CmdHello')
+    sig_cmd_get_settings = pyqtSignal(list, name='PositNetwork_CmdGetSettings')
+    sig_twr_ranging = pyqtSignal(list, name='PositNetwork_CmdTwrRanging')
 
     PB_TWR_MSGTYPE_NONE = 0
     PB_TWR_MSGTYPE_TWR = 1
-
-    sig_posit_settings_received = pyqtSignal(dict, name='PositNetwork_SettingsReceived')
-    sig_posit_hello_received = pyqtSignal(dict, name='PositNetwork_HelloReceived')
 
     def __init__(self):
         super().__init__()
         self.monitoring = Monitoring_pb2.Monitoring()
         self.settings = Settings_pb2.Settings()
-        self.client_list = list()
 
+    #
+    # @brief:   Function for parsing wake cmd and data from server clients
+    #           Function is called from UDPServerTask after successfully parsing wake packet
+    # @args:    str(ip_address), int(cmd), list(data)
+    #
     def rx_callback(self, ip, cmd, data):
         if cmd == Wake.CMD_GET_SETTINGS_RESP:
             return self.get_settings_callback(ip, data)
-        if cmd == Wake.CMD_TWR_RANGING:
-            return self.twr_ranging_callback(data)
+        elif cmd == Wake.CMD_TWR_RANGING:
+            return self.twr_ranging_callback(ip, data)
         else:
             return False
 
-    def hello_callback(self):
-        self.sig_posit_hello_received.emit()
+    def hello_callback(self, ip):
+        self.sig_cmd_hello.emit(ip)
         return True
 
     def get_settings_callback(self, ip, data):
         try:
             self.settings.ParseFromString(bytes(data))
+            settings_dict = MessageToDict(self.settings)
+            self.sig_cmd_get_settings.emit([ip, {settings_dict}])
         except Exception as e:
+            log.error(e)
             return e
-        settings_dict = MessageToDict(self.settings)
-        logger.debug('dev_settings:\n' + str(self.settings))
-        self.sig_posit_hello_received.emit(settings_dict)
         return True
 
-    def twr_ranging_callback(self, data):
+    def twr_ranging_callback(self, ip, data):
         try:
             self.monitoring.ParseFromString(bytes(data))
+            monitoring_dict = MessageToDict(self.settings)
         except Exception as e:
             return e
-
         if self.monitoring.TWR.MessageType == PositNetwork.PB_TWR_MSGTYPE_TWR:
-            logger.debug('Net Ranging:\t' + str(self.monitoring.TWR.Distance))
-        return True
-
-    def check_new_client(self, ip):
-        if len(self.client_list):
-            for client in self.client_list:
-                if client == ip:
-                    return False
-        self.client_list.append(ip)
+            self.sig_twr_ranging.emit([ip, monitoring_dict])
         return True

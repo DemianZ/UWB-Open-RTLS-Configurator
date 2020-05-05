@@ -1,4 +1,4 @@
-from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot
 from PyQt5.QtGui import QColor
 import atexit
 import logging as log
@@ -36,11 +36,8 @@ class SerialTask(QThread):
             if self.serial and self.connected:
                 try:
                     data = self.serial.read()
-                    # data.append(self.serial.read(2))
-                    # data_len = data[0] >> 8 + data[1]
-                    # data.append(self.serial.read(data_len))
-                # log.debug('COM RX: ' + str(' '.join('{:02X}'.format(c) for c in data)))
                 except serial.SerialException as e:
+                    self.usleep(100)
                     continue
 
                 if len(data):
@@ -49,9 +46,10 @@ class SerialTask(QThread):
                         log.debug('CMD_' + str(hex(cmd_res['cmd'])) +
                                   ' DATA: ' + str(' '.join('{:02X}'.format(c) for c in cmd_res['data'])))
                         self.posit.rx_callback(cmd_res['cmd'], cmd_res['data'])
-                self.usleep(100)
-            else:
-                self.usleep(100)
+            self.usleep(100)
+
+    def stop(self):
+        self.quit()
 
     def get_ports(self):
         self.port_list = list()
@@ -92,6 +90,7 @@ class SerialTask(QThread):
         else:
             return False
 
+    @pyqtSlot()
     def close_port(self):
         if self.serial.is_open:
             self.connected = False
@@ -103,6 +102,7 @@ class SerialTask(QThread):
         if self.serial and self.serial.is_open:
             self.serial.write(buf)
 
+    @pyqtSlot(dict)
     def set_settings(self, settings_dict):
         settings_pb = Settings_pb2.Settings()
         ParseDict(settings_dict, settings_pb)
@@ -112,6 +112,7 @@ class SerialTask(QThread):
             self.serial.write(buf)
         pass
 
+    @pyqtSlot()
     def set_default_settings(self):
         buf = self.wake.prepare(Wake.CMD_SET_DEF_SETTINGS_REQ, [])
         if self.serial and self.serial.is_open:

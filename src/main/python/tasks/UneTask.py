@@ -560,9 +560,8 @@ class UneTask(QThread):
         """ Documentation for a method
             ..........................
         """
-        t = time.time()
         while True:
-            time.sleep(self.const.epoch_period)
+            self.sleep(self.const.epoch_period)
 
             # Compute position
             self.une.get_position()
@@ -580,6 +579,9 @@ class UneTask(QThread):
                 if len(pvt) > 0:
                     # Emit signal with new PVT vector for all tags in current epoch
                     self.api_sig_new_pvt.emit(pvt)
+
+    def stop(self):
+        self.quit()
 
     @pyqtSlot(UneTag)
     def api_slot_add_tag(self, tag):
@@ -649,7 +651,7 @@ class UneTaskTst(QThread):
             if flg_compute is True:
                 flg_compute = False
                 for epoch in self.m_pp_meas:
-                    time.sleep(0.05)
+                    self.usleep(50)
 
                     print('-I- [UneTask::run] Compute tag PVT. UTC:', epoch)
 
