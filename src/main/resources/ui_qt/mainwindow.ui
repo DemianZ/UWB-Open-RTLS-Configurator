@@ -270,7 +270,7 @@
               <number>1</number>
              </property>
              <item>
-              <widget class="QTableWidget" name="tableWidget_config">
+              <widget class="QTableWidget" name="tableWidget_serialConfig">
                <property name="sizeAdjustPolicy">
                 <enum>QAbstractScrollArea::AdjustIgnored</enum>
                </property>
@@ -316,21 +316,21 @@
              <item>
               <layout class="QGridLayout" name="gridLayout">
                <item row="0" column="0">
-                <widget class="QPushButton" name="pushButton_rdConfig">
+                <widget class="QPushButton" name="pushButton_serialReadConfig">
                  <property name="text">
                   <string>Read</string>
                  </property>
                 </widget>
                </item>
                <item row="0" column="1">
-                <widget class="QPushButton" name="pushButton_wrConfig">
+                <widget class="QPushButton" name="pushButton_serialWriteConfig">
                  <property name="text">
                   <string>Write</string>
                  </property>
                 </widget>
                </item>
                <item row="0" column="2">
-                <widget class="QPushButton" name="pushButton_defConfig">
+                <widget class="QPushButton" name="pushButton_serialDefConfig">
                  <property name="text">
                   <string>Reset to default settings</string>
                  </property>
@@ -484,6 +484,15 @@
                 </property>
                 <item>
                  <widget class="QTableWidget" name="tableWidget_networkList">
+                  <property name="selectionMode">
+                   <enum>QAbstractItemView::SingleSelection</enum>
+                  </property>
+                  <property name="selectionBehavior">
+                   <enum>QAbstractItemView::SelectRows</enum>
+                  </property>
+                  <property name="sortingEnabled">
+                   <bool>true</bool>
+                  </property>
                   <attribute name="horizontalHeaderDefaultSectionSize">
                    <number>70</number>
                   </attribute>
@@ -544,7 +553,7 @@
                  <number>1</number>
                 </property>
                 <item>
-                 <widget class="QTableWidget" name="tableWidget_configNet">
+                 <widget class="QTableWidget" name="tableWidget_netConfig">
                   <property name="sizeAdjustPolicy">
                    <enum>QAbstractScrollArea::AdjustIgnored</enum>
                   </property>
@@ -590,21 +599,21 @@
                 <item>
                  <layout class="QGridLayout" name="gridLayout_2">
                   <item row="0" column="0">
-                   <widget class="QPushButton" name="pushButton_rdConfigNet">
+                   <widget class="QPushButton" name="pushButton_netReadConfig">
                     <property name="text">
                      <string>Read</string>
                     </property>
                    </widget>
                   </item>
                   <item row="0" column="1">
-                   <widget class="QPushButton" name="pushButton_wrConfigNet">
+                   <widget class="QPushButton" name="pushButton_netWriteConfig">
                     <property name="text">
                      <string>Write</string>
                     </property>
                    </widget>
                   </item>
                   <item row="0" column="2">
-                   <widget class="QPushButton" name="pushButton_defConfigNet">
+                   <widget class="QPushButton" name="pushButton_netDefConfig">
                     <property name="text">
                      <string>Reset to default settings</string>
                     </property>

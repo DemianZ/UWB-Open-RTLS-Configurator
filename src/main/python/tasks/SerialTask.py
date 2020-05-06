@@ -5,7 +5,7 @@ import logging as log
 import serial
 import json
 import serial.tools.list_ports
-from modules.wake import Wake
+
 from modules.positSerial import PositSerial
 from proto import Settings_pb2
 from google.protobuf.json_format import Parse, ParseDict
@@ -24,8 +24,7 @@ class SerialTask(QThread):
         self.port_list = list()
         self.com_port = None
         self.connected = None
-        self.wake = Wake()
-        self.posit = PositSerial()
+        self.posit = PositSerial(self.serial)
         atexit.register(self.terminate)  # function to be executed on exit
 
     # Task loop
@@ -39,14 +38,9 @@ class SerialTask(QThread):
                 except serial.SerialException as e:
                     self.usleep(100)
                     continue
-
                 if len(data):
-                    cmd_res = self.wake.process(data)
-                    if cmd_res is not None:
-                        log.debug('CMD_' + str(hex(cmd_res['cmd'])) +
-                                  ' DATA: ' + str(' '.join('{:02X}'.format(c) for c in cmd_res['data'])))
-                        self.posit.rx_callback(cmd_res['cmd'], cmd_res['data'])
-            self.usleep(100)
+                    self.posit.process(data)
+            self.usleep(1)
 
     def stop(self):
         self.quit()
@@ -75,20 +69,21 @@ class SerialTask(QThread):
 
         if self.serial and self.serial.isOpen():
             self.close_port()
-
-        self.serial = serial.Serial(
-            port=self.com_port.device,
-            baudrate=19200,
-            parity=serial.PARITY_ODD,
-            stopbits=serial.STOPBITS_TWO,
-        )
-        if self.serial.isOpen():
-            self.connected = True
-            self.sig_status_changed.emit('Connected to ' + self.com_port.description)
-            self.sig_add_console_logs.emit('Connected to ' + self.com_port.device, QColor("blue"))
-            return True
-        else:
-            return False
+        try:
+            self.serial = serial.Serial(
+                port=self.com_port.device,
+                baudrate=19200,
+                parity=serial.PARITY_ODD,
+                stopbits=serial.STOPBITS_TWO,
+            )
+            if self.serial.isOpen():
+                self.connected = True
+                self.sig_status_changed.emit('Connected to ' + self.com_port.description)
+                self.sig_add_console_logs.emit('Connected to ' + self.com_port.device, QColor("blue"))
+                return True
+        except serial.serialutil.SerialException as e:
+            log.debug(str(e))
+        return False
 
     @pyqtSlot()
     def close_port(self):
@@ -97,23 +92,7 @@ class SerialTask(QThread):
             self.sig_status_changed.emit('Disconnected from ' + self.com_port.description)
             self.serial.close()
 
-    def get_settings(self):
-        buf = self.wake.prepare(Wake.CMD_GET_SETTINGS_REQ, [])
-        if self.serial and self.serial.is_open:
-            self.serial.write(buf)
-
-    @pyqtSlot(dict)
-    def set_settings(self, settings_dict):
-        settings_pb = Settings_pb2.Settings()
-        ParseDict(settings_dict, settings_pb)
-        settings_string = settings_pb.SerializeToString()
-        buf = self.wake.prepare(Wake.CMD_SET_SETTINGS_REQ, settings_string)
-        if self.serial and self.serial.is_open:
-            self.serial.write(buf)
-        pass
-
     @pyqtSlot()
-    def set_default_settings(self):
-        buf = self.wake.prepare(Wake.CMD_SET_DEF_SETTINGS_REQ, [])
+    def serial_write(self, data):
         if self.serial and self.serial.is_open:
-            self.serial.write(buf)
+            self.serial.write(data)

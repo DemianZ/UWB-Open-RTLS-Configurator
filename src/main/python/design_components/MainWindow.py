@@ -11,6 +11,7 @@ from tasks.SerialTask import SerialTask
 from tasks.UDPServerTask import UdpServerTask
 from tasks.UneTask import UneTask, UneNavMethod
 from tasks.PositTask import PositTask
+from modules.positSerial import PositSerial
 
 # from matplotlib.backends.backend_qt5agg import (                      # uncomment for mpl toolbar
 #         FigureCanvas, NavigationToolbar2QT as NavigationToolbar)      # uncomment for mpl toolbar
@@ -75,43 +76,56 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             lambda: self.serial_task.port_changed(self.comboBox_port.currentIndex()))
         self.pushButton_connect.clicked.connect(self.serial_task.open_port)
         self.pushButton_disconnect.clicked.connect(self.serial_task.close_port)
-        self.pushButton_rdConfig.clicked.connect(self.serial_task.get_settings)
-        self.pushButton_wrConfig.clicked.connect(
-            lambda: self.serial_task.set_settings(self.serial_get_settings_table_data()))
-        self.pushButton_defConfig.clicked.connect(self.serial_task.set_default_settings)
+        self.pushButton_serialReadConfig.clicked.connect(self.serial_task.posit.get_settings)
+        self.pushButton_serialWriteConfig.clicked.connect(
+            lambda: self.serial_task.posit.set_settings(self.get_settings_table_data(self.tableWidget_serialConfig)))
+        self.pushButton_serialDefConfig.clicked.connect(self.serial_task.posit.set_default_settings)
         # Posit Task
         self.sig_ui_add_anchor_req.connect(lambda data: self.posit_task.add_anchor_req(data))
         self.sig_ui_add_tag_req.connect(lambda node_id: self.posit_task.add_tag_req(node_id))
         self.sig_ui_connect_nodes_req.connect(lambda data: self.posit_task.connect_nodes_req(data))
+        self.toolButton_startUne.clicked.connect(self.posit_task.start_une)
 
+        self.pushButton_netReadConfig.clicked.connect(self.net_get_settings_req)
+
+        self.pushButton_netWriteConfig.clicked.connect(self.net_set_settings_req)
+        self.pushButton_netDefConfig.clicked.connect(self.net_set_default_settings_req)
     # @brief: Connect signals from other tasks to local functions.
+
     def connect_ext_signals_ui_slots(self):
-        # Serial Task
+        # SerialTask + SerialTask.PositSerial
         self.serial_task.sig_serial_list_ports.connect(lambda ports: self.serial_add_ports(ports))
-        self.serial_task.posit.sig_posit_settings_received.connect(lambda sets: self.serial_received_settings(sets))
         self.serial_task.sig_status_changed.connect(lambda st: self.serial_status_changed(st))
         self.serial_task.sig_add_console_logs.connect(lambda text, color: self.serial_add_console_logs(text, color))
-        # Posit Task
-        # Network device list table widget signals/slots.
-        self.posit_task.sig_update_settings.connect(lambda data: self.network_received_settings(data))
-        self.posit_task.sig_add_device.connect(lambda data: self.network_add_device(data))
-        self.posit_task.sig_remove_device.connect(lambda ip: self.network_remove_device(ip))
-        self.posit_task.sig_update_device.connect(lambda data: self.network_update_device(data))
-        self.posit_task.sig_add_anchor_resp.connect(lambda node_id: self.add_anchor_resp(node_id))
-        self.posit_task.sig_add_tag_resp.connect(lambda node_id: self.add_tag_resp(node_id))
-        self.posit_task.sig_connect_une_resp.connect(lambda tags: self.connect_nodes_resp(tags))
+        self.serial_task.posit.sig_posit_settings_received.connect(lambda sets: self.serial_update_settings(sets))
+        # UdpTask.PositNetwork
+        self.udp_task.posit.sig_ui_update_settings.connect(lambda data: self.network_update_settings(data))
+        self.udp_task.posit.sig_ui_add_device.connect(lambda data: self.network_add_device(data))
+        self.udp_task.posit.sig_ui_remove_device.connect(lambda ip: self.network_remove_device(ip))
+        self.udp_task.posit.sig_ui_update_device.connect(lambda data: self.network_update_device(data))
+        # PositTask
+        self.posit_task.sig_ui_add_anchor_resp.connect(lambda node_id: self.add_anchor_resp(node_id))
+        self.posit_task.sig_ui_add_tag_resp.connect(lambda node_id: self.add_tag_resp(node_id))
+        self.posit_task.sig_ui_connect_une_resp.connect(lambda tags: self.connect_nodes_resp(tags))
 
     def connect_ext_signals_ext_slots(self):
-        self.udp_task.posit.sig_cmd_hello.connect(lambda ip: self.posit_task.slot_cmd_hello(ip))
-        self.udp_task.posit.sig_cmd_get_settings.connect(lambda data: self.posit_task.slot_cmd_get_settings(data))
-        self.udp_task.posit.sig_twr_ranging.connect(lambda data: self.posit_task.slot_twr_ranging(data))
+        self.serial_task.posit.sig_serial_write.connect(lambda data: self.serial_task.serial_write(data))
+        self.udp_task.posit.sig_udp_transmit.connect(lambda ip, data: self.udp_task.udp_transmit(ip, data))
+
+        self.posit_task.sig_une_add_new_tag.connect(lambda tag: self.une_task.api_slot_add_tag(tag))
+        self.posit_task.sig_une_upd_tag_meas.connect(
+            lambda tag_id, anchors_meas: self.une_task.api_slot_tag_upd_meas(tag_id, anchors_meas))
+        self.une_task.api_sig_new_pvt.connect(
+            lambda pvt: self.posit_task.une_new_pvt(pvt))
+        self.udp_task.posit.sig_posit_twr_received.connect(
+            lambda ip, distance: self.posit_task.net_twr_received(ip, distance))
 
     # @brief: Start all application tasks.
     def start_tasks(self):
         self.serial_task.start()
         self.udp_task.start()
         self.posit_task.start()
-        # self.une_task.start()
+        self.une_task.start()
 
     def stop_tasks(self):
         self.serial_task.stop()
@@ -131,22 +145,24 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         os._exit(0)
 
     # @brief: Refresh ports in "choose port" combo-box.
+    @pyqtSlot(dict)
     def serial_add_ports(self, ports):
         self.comboBox_port.clear()
         self.comboBox_port.addItems(ports['port_desc'])
         self.comboBox_port.setCurrentIndex(0)
         self.comboBox_port.setCurrentText(ports['port_desc'][0])
 
-    def serial_received_settings(self, sets):
-        self.tableWidget_config.setRowCount(0)
+    @pyqtSlot(dict)
+    def serial_update_settings(self, sets):
+        self.tableWidget_serialConfig.setRowCount(0)
         for name, value in sets.items():
-            row_position = self.tableWidget_config.rowCount()
-            self.tableWidget_config.insertRow(row_position)
+            row_position = self.tableWidget_serialConfig.rowCount()
+            self.tableWidget_serialConfig.insertRow(row_position)
             item_name = QTableWidgetItem(str(name))
             item_name.setFlags(Qt.ItemIsEnabled)    # disable editing
             item_value = QTableWidgetItem(str(value))
-            self.tableWidget_config.setItem(row_position, 0, item_name)
-            self.tableWidget_config.setItem(row_position, 1, item_value)
+            self.tableWidget_serialConfig.setItem(row_position, 0, item_name)
+            self.tableWidget_serialConfig.setItem(row_position, 1, item_value)
 
     @pyqtSlot(str, str)
     def serial_status_changed(self, st):
@@ -158,67 +174,50 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.textBrowser_console.append(str(text))
         self.textBrowser_console.repaint()
 
-    # @brief Method to get settings dict from serial device configuration table.
-    def serial_get_settings_table_data(self):
-        table_view = self.tableWidget_config
-        data = dict()
-        for row in range(table_view.rowCount()):
-            key_data = table_view.model().index(row, 0).data()
-            value_data = table_view.model().index(row, 1).data()
-            data.update({str(key_data): value_data})
-        return data
-
     @pyqtSlot(dict)
-    def network_received_settings(self, sets):
-        self.tableWidget_configNet.setRowCount(0)
+    def network_update_settings(self, sets):
+        self.tableWidget_netConfig.setRowCount(0)
         for name, value in sets.items():
-            row_position = self.tableWidget_configNet.rowCount()
-            self.tableWidget_configNet.insertRow(row_position)
+            row_position = self.tableWidget_netConfig.rowCount()
+            self.tableWidget_netConfig.insertRow(row_position)
             item_name = QTableWidgetItem(str(name))
             item_name.setFlags(Qt.ItemIsEnabled)    # disable editing
             item_value = QTableWidgetItem(str(value))
-            self.tableWidget_configNet.setItem(row_position, 0, item_name)
-            self.tableWidget_configNet.setItem(row_position, 1, item_value)
+            self.tableWidget_netConfig.setItem(row_position, 0, item_name)
+            self.tableWidget_netConfig.setItem(row_position, 1, item_value)
+        self.tableWidget_netConfig.setSelectionBehavior(QTableView.SelectRows)
 
     # @brief:   Add device to "Network List" table.
-    # @args:    list(ip, {settings})
+    # @args:    list([NodeID, IP, Type, Mode, Rx/Tx, Error])
     @pyqtSlot(list)
     def network_add_device(self, data):
         row_position = self.tableWidget_networkList.rowCount()
         self.tableWidget_networkList.insertRow(row_position)
-        if data[0] is not None:
-            ip = data[0]
-            item_node_ip = QTableWidgetItem(str(ip))
-            item_node_ip.setFlags(Qt.ItemIsEnabled)  # disable editing
-            self.tableWidget_networkList.setItem(row_position, 1, item_node_ip)
-
-        if len(data[1]) == 0:
-            return
-
-        settings = data[1]
-        for sett, val in settings.items():
-            item = None
-            pos = 0
-            if sett == 'NodeID':
-                item = QTableWidgetItem(str(settings['NodeID']))
-                pos = 0
-            elif sett == 'NodeType':
-                pos = 2
-            elif sett == 'RTLSMode':
-                pos = 3
-            if item is None:
-                continue
-            item = QTableWidgetItem(str(settings['sett']))
-            item.setFlags(Qt.ItemIsEnabled)  # disable editing
-            self.tableWidget_configNet.setItem(row_position, pos, item)
+        for i, par in enumerate(data):
+            item = QTableWidgetItem(str(par))
+            item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)  # disable editing
+            self.tableWidget_networkList.setItem(row_position, i, item)
         return
 
-    @pyqtSlot(str)
-    def network_remove_device(self, node_id):
+    # @brief:   Remove device from "Network List" table.
+    # @args:    list([NodeID, IP, Type, Mode, Rx/Tx, Error])
+    @pyqtSlot(list)
+    def network_remove_device(self, node_data):
         return
 
+    # @brief:   Update device from "Network List" table.
+    # @args:    list([NodeID, IP, Type, Mode, Rx/Tx, Error])
     @pyqtSlot(list)
     def network_update_device(self, device):
+        for i in range(self.tableWidget_networkList.rowCount()):
+            ip = self.tableWidget_networkList.item(i, 1).text()
+            if ip == device[1]:
+                row_position = i
+                break
+        for i, par in enumerate(device):
+            item = QTableWidgetItem(str(device[i]))
+            item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)  # disable editing
+            self.tableWidget_networkList.setItem(row_position, i, item)
         return
 
     # @brief: Slot called on "Add Anchor" button click.
@@ -269,6 +268,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     #   Slot called on "Connect" tool-button click.
     #   Takes all selected NodeIDs from tag and anchor tree-views and sends them to PositTask.
     #         Sends signal to PositTask to make new UNE connections.
+    @pyqtSlot()
     def connect_nodes_req(self):
         selected_tags = [item.text() for item in self.listWidget_tag.selectedItems()]
         selected_anchors = [item.text() for item in self.listWidget_anchor.selectedItems()]
@@ -277,11 +277,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     # @brief: Slot called on response from PositTask to connect_nodes_req.
     #         Adds new connection items to UNE status tree-view.
+    @pyqtSlot(list)
     def connect_nodes_resp(self, tags):
         self.treeWidget_uneStatus.clear()
         for t in tags:
             tag_item = QTreeWidgetItem(self.treeWidget_uneStatus)
-            tag_item.setText(0, t[0])
+            tag_item.setText(0, t[0].m_name)
             for an in t[1]:
                 an_item = QTreeWidgetItem(tag_item)
                 an_item.setText(0, an[0])
@@ -291,3 +292,37 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.treeWidget_uneStatus.sortByColumn(0, Qt.AscendingOrder)
         self.treeWidget_uneStatus.show()
         return
+
+    # @brief Method to get settings dict from serial device configuration table.
+    @staticmethod
+    def get_settings_table_data(table_view):
+        data = dict()
+        for row in range(table_view.rowCount()):
+            key_data = table_view.model().index(row, 0).data()
+            value_data = table_view.model().index(row, 1).data()
+            data.update({str(key_data): value_data})
+        for key in PositSerial.ip32_keys:
+            if key in data:
+                data[key] = PositSerial.str_to_ip32(str(data[key]))
+        return data
+
+    @pyqtSlot()
+    def net_get_settings_req(self):
+        selected_row_i = self.tableWidget_networkList.selectionModel().selectedRows()[0].row()
+        ip = self.tableWidget_networkList.item(selected_row_i, 1).text()
+
+        self.udp_task.posit.get_settings_req(ip)
+
+    @pyqtSlot()
+    def net_set_settings_req(self):
+        selected_row_i = self.tableWidget_networkList.selectionModel().selectedRows()[0].row()
+        ip = self.tableWidget_networkList.item(selected_row_i, 1).text()
+
+        sett_dict = self.get_settings_table_data(self.tableWidget_netConfig)
+        self.udp_task.posit.set_settings_req(ip, sett_dict)
+
+    @pyqtSlot()
+    def net_set_default_settings_req(self):
+        selected_row_i = self.tableWidget_networkList.selectionModel().selectedRows()[0].row()
+        ip = self.tableWidget_networkList.item(selected_row_i, 1).text()
+        self.udp_task.posit.set_default_settings_req(ip)

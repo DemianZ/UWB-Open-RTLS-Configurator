@@ -561,7 +561,7 @@ class UneTask(QThread):
             ..........................
         """
         while True:
-            self.sleep(self.const.epoch_period)
+            time.sleep(self.const.epoch_period)
 
             # Compute position
             self.une.get_position()
@@ -606,7 +606,7 @@ class UneTask(QThread):
             # Set flag to start computation of the PVT
             tag.set_flags(UneFlags.get_new_pvt, True)
 
-            print('-I- [UneTask::api_slot_tag_upd_meas] Update tag measurements')
+            # print('-I- [UneTask::api_slot_tag_upd_meas] Update tag measurements')
 
 
 # !!! For test. Delete later

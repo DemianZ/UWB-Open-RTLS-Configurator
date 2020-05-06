@@ -1,4 +1,4 @@
-from PyQt5.QtCore import QThread
+from PyQt5.QtCore import QThread, pyqtSlot
 import atexit
 import socket
 import logging as log
@@ -19,7 +19,6 @@ class UdpServerTask(QThread):
         self.sock = None
         self.ip = UDP_SRV
         self.port = UDP_PORT
-        self.wake = Wake()
         self.posit = PositNetwork()
         self.client_list = list()   # ip addresses
 
@@ -33,17 +32,11 @@ class UdpServerTask(QThread):
 
         while True:
             data, address = self.sock.recvfrom(1024)  # buffer size is 1024 bytes
-            ip = address[0]
+            if address not in self.client_list:
+                self.client_list.append(address)
             if len(data):
-                cmd_res = self.wake.process(data)
-                if cmd_res is not None:
-                    log.debug('CMD_' + str(hex(cmd_res['cmd'])) +
-                              ' DATA: ' + str(' '.join('{:02X}'.format(c) for c in cmd_res['data'])))
-                    if self.posit.rx_callback(ip, cmd_res['cmd'], cmd_res['data']) is True:
-                        if self.posit.check_new_client(ip) is True:
-                            self.get_settings(ip)
-
-            self.usleep(100)
+                self.posit.process(address, data)
+            self.usleep(1)
 
     def stop(self):
         self.quit()
@@ -58,7 +51,6 @@ class UdpServerTask(QThread):
             return False
         return True
 
-    def get_settings(self, ip):
-        buf = self.wake.prepare(Wake.CMD_GET_SETTINGS_REQ, [])
-        self.sock.sendto(bytearray(buf), (ip, UDP_PORT))
-
+    @pyqtSlot(tuple, dict)
+    def udp_transmit(self, ip, data):
+        self.sock.sendto(bytes(data), (ip, UDP_PORT))

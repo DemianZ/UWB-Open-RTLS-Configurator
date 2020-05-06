@@ -3,6 +3,10 @@ import atexit
 import logging as log
 import json
 import os
+from tasks.UneTask import UneTag
+from proto import Settings_pb2
+from google.protobuf.json_format import Parse, ParseDict
+from modules.wake import Wake
 
 
 #
@@ -28,26 +32,32 @@ import os
 #   PositTask_ConnectUneResp    args: dict {TagID: [AnchorId, ...]}
 #       - response to UI for connecting anchors and nodes.
 #
-class PositTask(QThread):
-    sig_update_settings = pyqtSignal(list, name='PositTask_UpdateSettings')
-    sig_add_device = pyqtSignal(list, name='PositTask_AddDevice')
-    sig_remove_device = pyqtSignal(str, name='PositTask_RemoveDevice')
-    sig_update_device = pyqtSignal(list, name='PositTask_UpdateDevice')
+#   UneTask_AddTag:             @args UneTag()
+#       - adding new tag in UNE
+#   UneTask_UpdMeas:            @args: tag name, {'anchor': [distance, snr], ...}
+#       - signal for updating tag measurement
 
-    sig_add_anchor_resp = pyqtSignal(str, name='PositTask_AddAnchorResp')
-    sig_add_tag_resp = pyqtSignal(str, name='PositTask_AddTagResp')
-    sig_connect_une_resp = pyqtSignal(list, name='PositTask_ConnectUneResp')
+class PositTask(QThread):
+    sig_une_add_new_tag = pyqtSignal(UneTag, name='UneTask_AddTag')
+    sig_une_upd_tag_meas = pyqtSignal(str, dict, name='')
+
+    sig_udp_transmit = pyqtSignal(tuple, list, name='PositTask_UdpTransmit')
+
+    sig_ui_add_anchor_resp = pyqtSignal(str, name='PositTask_AddAnchorResp')
+    sig_ui_add_tag_resp = pyqtSignal(str, name='PositTask_AddTagResp')
+    sig_ui_connect_une_resp = pyqtSignal(list, name='PositTask_ConnectUneResp')
 
     def __init__(self):
         QThread.__init__(self)
         atexit.register(self.terminate)     # function to be executed on exit
 
         self.anchor_list = list()           # [[ip, {settings}]]
-
         self.anchor_une_list = list()       # [[id, [pos_x, pos_y, pos_z]]]
         self.tag_une_list = list()          # [id]
-        self.une_list = list()              # [[tag_id ,[anchor_id,...]]]
+        self.une_list = list()              # [[UneTag ,[anchor_id,...]]]
         self.une_activated = False
+        self.epoch_pvt = dict()
+        self.epoch_cnt = 0
 
     # Task loop
     def run(self):
@@ -56,8 +66,7 @@ class PositTask(QThread):
             if self.une_activated:
                 self.usleep(1)
                 continue
-
-            self.usleep(100)
+            self.usleep(1)
 
     def stop(self):
         self.quit()
@@ -89,7 +98,7 @@ class PositTask(QThread):
     def check_tag_in_une_list(self, node_id):
         if len(self.tag_une_list):
             for i, tag in enumerate(self.tag_une_list):
-                if tag[0] == node_id:
+                if tag.m_name == node_id:
                     return i
         return -1
 
@@ -102,44 +111,18 @@ class PositTask(QThread):
                         return value
         return False
 
-    # @brief: Slot is fired every time hello cmd received from server
-    @pyqtSlot(str)
-    def slot_cmd_hello(self, ip):
-        if not self.check_anchor_in_list(ip):
-            self.anchor_list.append([ip])      # empty settings
-            self.sig_add_device.emit([ip, dict()])
-            return
-
-    # @brief: Slot is fired every time device settings received from server
-    #         Adds settings to local dict
-    #         If new device, emit signal to UI for adding it to device list.
-    @pyqtSlot(list)
-    def slot_cmd_get_settings(self, data):
-        ip = data[0]
-        settings = data[1]
-        self.anchor_list[str(ip)] = settings
-        if not self.check_anchor_has_settings(ip):
-            self.sig_add_device.emit([ip, settings])
-        self.sig_update_device.emit([ip, settings['NodeID', 'NodeType', 'RTLSMode', 0, 0]])
-
-    @pyqtSlot(list)
-    def slot_twr_ranging(self, data):
-        ip = data[0]
-        monitoring = data[1]
-        log.debug(str(ip) + ': ' + monitoring.TWR.Distance)
-
     @pyqtSlot(list)
     def add_anchor_req(self, data):
         node_id = data[0]
         pos_x = data[1][0]
-        pos_y = data[1][0]
-        pos_z = data[1][0]
+        pos_y = data[1][1]
+        pos_z = data[1][2]
         anchor_i = self.check_anchor_in_une_list(node_id)
         if anchor_i >= 0:
             self.anchor_une_list[anchor_i][1] = [pos_x, pos_y, pos_z]
         else:
             self.anchor_une_list.append([node_id, [pos_x, pos_y, pos_z]])
-            self.sig_add_anchor_resp.emit(node_id)
+            self.sig_ui_add_anchor_resp.emit(node_id)
         return
 
     @pyqtSlot(str)
@@ -148,8 +131,8 @@ class PositTask(QThread):
         if tag_i >= 0:
             pass
         else:
-            self.tag_une_list.append(node_id)
-            self.sig_add_tag_resp.emit(node_id)
+            self.tag_une_list.append(UneTag(node_id))
+            self.sig_ui_add_tag_resp.emit(node_id)
         return
 
     # @brief:   Request from UI to refresh une status list-view
@@ -166,14 +149,36 @@ class PositTask(QThread):
                 if an[0] == an_id:
                     anchor_list.append(an)
         for i in tag_id:
-            self.une_list.append([i, anchor_list])
+            self.une_list.append([UneTag(i), anchor_list])
         if len(self.une_list):
-            self.sig_connect_une_resp.emit(self.une_list)
+            self.sig_ui_connect_une_resp.emit(self.une_list)
         return
 
-    # @pyqtSlot(str)
-    # def ui_get_settings(self, ip):
-    #     settings = self.check_client_has_settings(ip)
-    #     if settings:
-    #         self.sig_update_settings.emit([ip, settings])
+    @pyqtSlot()
+    def start_une(self):
+        self.une_activated = True
+        for tag in self.une_list:
+            for an in tag[1]:
+                tag[0].add_anchor(an[0], float(an[1][0]), float(an[1][1]), float(an[1][2]))
+            self.sig_une_add_new_tag.emit(tag[0])
 
+    @pyqtSlot(dict)         # from UneTsk
+    def une_new_pvt(self, pvt):
+        for tag, pvt_data in pvt.items():
+            pos_x = pvt_data[0]
+            pos_y = pvt_data[1]
+            pos_z = pvt_data[2]
+            log.debug('TAG{} X:{:f}, Y:{:f}, Z:{:f}'.format(tag, pos_x, pos_y, pos_z))
+
+    @pyqtSlot(str, float)    # from UDPServerTask.positNetwork to UneTask
+    def net_twr_received(self, ip, distance):
+        if self.une_activated is not True:
+            return
+        if ip not in self.epoch_pvt:
+            self.epoch_pvt[ip] = [distance, -128]
+        if len(self.epoch_pvt) == len(self.anchor_une_list):
+            self.sig_une_upd_tag_meas.emit('1', self.epoch_pvt)
+            # log.debug("TWR_EPOCH " + str(self.epoch_cnt) + "\n" + str(self.epoch_pvt))
+            self.epoch_pvt = dict()
+            self.epoch_cnt += 1
+        return
