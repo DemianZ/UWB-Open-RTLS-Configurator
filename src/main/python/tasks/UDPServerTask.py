@@ -2,7 +2,7 @@ from PyQt5.QtCore import QThread, pyqtSlot
 import atexit
 import socket
 import logging as log
-from modules.positNetwork import PositNetwork
+from modules.PositNetwork import PositNetwork
 from modules.wake import Wake
 
 UDP_SRV = "10.90.90.99"     # Your PC's IP

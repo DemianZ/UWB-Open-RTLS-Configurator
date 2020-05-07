@@ -627,13 +627,13 @@
             </layout>
            </item>
            <item>
-            <layout class="QVBoxLayout" name="verticalLayout_10" stretch="1,1">
+            <layout class="QVBoxLayout" name="verticalLayout_10" stretch="1">
              <item>
               <widget class="QGroupBox" name="groupBox_4">
                <property name="title">
                 <string>UNE Configuration</string>
                </property>
-               <layout class="QVBoxLayout" name="verticalLayout_6" stretch="4,0,5">
+               <layout class="QVBoxLayout" name="verticalLayout_6" stretch="4,1,4,10">
                 <property name="leftMargin">
                  <number>3</number>
                 </property>
@@ -649,16 +649,9 @@
                 <item>
                  <layout class="QHBoxLayout" name="horizontalLayout_9" stretch="1,1">
                   <item>
-                   <layout class="QVBoxLayout" name="verticalLayout_9" stretch="4,1">
+                   <layout class="QVBoxLayout" name="verticalLayout_9" stretch="1,4">
                     <item>
-                     <widget class="QListWidget" name="listWidget_anchor">
-                      <property name="selectionMode">
-                       <enum>QAbstractItemView::ExtendedSelection</enum>
-                      </property>
-                     </widget>
-                    </item>
-                    <item>
-                     <layout class="QHBoxLayout" name="horizontalLayout_6" stretch="2,1,1,1,2">
+                     <layout class="QHBoxLayout" name="horizontalLayout_6" stretch="2,1,1,2">
                       <item>
                        <widget class="QTextEdit" name="textEdit_anchorId">
                         <property name="sizePolicy">
@@ -670,8 +663,13 @@
                         <property name="minimumSize">
                          <size>
                           <width>60</width>
-                          <height>30</height>
+                          <height>25</height>
                          </size>
+                        </property>
+                        <property name="font">
+                         <font>
+                          <pointsize>10</pointsize>
+                         </font>
                         </property>
                         <property name="tabChangesFocus">
                          <bool>true</bool>
@@ -681,31 +679,6 @@
                         </property>
                         <property name="placeholderText">
                          <string>NodeID</string>
-                        </property>
-                       </widget>
-                      </item>
-                      <item>
-                       <widget class="QTextEdit" name="textEdit_anchorX">
-                        <property name="sizePolicy">
-                         <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
-                          <horstretch>0</horstretch>
-                          <verstretch>0</verstretch>
-                         </sizepolicy>
-                        </property>
-                        <property name="minimumSize">
-                         <size>
-                          <width>40</width>
-                          <height>30</height>
-                         </size>
-                        </property>
-                        <property name="tabChangesFocus">
-                         <bool>true</bool>
-                        </property>
-                        <property name="acceptRichText">
-                         <bool>false</bool>
-                        </property>
-                        <property name="placeholderText">
-                         <string>X</string>
                         </property>
                        </widget>
                       </item>
@@ -720,8 +693,13 @@
                         <property name="minimumSize">
                          <size>
                           <width>40</width>
-                          <height>30</height>
+                          <height>25</height>
                          </size>
+                        </property>
+                        <property name="font">
+                         <font>
+                          <pointsize>10</pointsize>
+                         </font>
                         </property>
                         <property name="tabChangesFocus">
                          <bool>true</bool>
@@ -745,8 +723,13 @@
                         <property name="minimumSize">
                          <size>
                           <width>40</width>
-                          <height>30</height>
+                          <height>25</height>
                          </size>
+                        </property>
+                        <property name="font">
+                         <font>
+                          <pointsize>10</pointsize>
+                         </font>
                         </property>
                         <property name="tabChangesFocus">
                          <bool>true</bool>
@@ -761,6 +744,11 @@
                       </item>
                       <item>
                        <widget class="QPushButton" name="pushButton_addAnchor">
+                        <property name="font">
+                         <font>
+                          <pointsize>10</pointsize>
+                         </font>
+                        </property>
                         <property name="text">
                          <string>Add Anchor</string>
                         </property>
@@ -768,17 +756,17 @@
                       </item>
                      </layout>
                     </item>
-                   </layout>
-                  </item>
-                  <item>
-                   <layout class="QVBoxLayout" name="verticalLayout_11" stretch="4,1">
                     <item>
-                     <widget class="QListWidget" name="listWidget_tag">
+                     <widget class="QListWidget" name="listWidget_anchor">
                       <property name="selectionMode">
                        <enum>QAbstractItemView::ExtendedSelection</enum>
                       </property>
                      </widget>
                     </item>
+                   </layout>
+                  </item>
+                  <item>
+                   <layout class="QVBoxLayout" name="verticalLayout_11" stretch="1,4">
                     <item>
                      <layout class="QHBoxLayout" name="horizontalLayout_7" stretch="0,0">
                       <item>
@@ -786,8 +774,13 @@
                         <property name="minimumSize">
                          <size>
                           <width>0</width>
-                          <height>30</height>
+                          <height>25</height>
                          </size>
+                        </property>
+                        <property name="font">
+                         <font>
+                          <pointsize>10</pointsize>
+                         </font>
                         </property>
                         <property name="tabChangesFocus">
                          <bool>true</bool>
@@ -802,8 +795,8 @@
                          <string>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
 &lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
 p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'.AppleSystemUIFont'; font-size:12pt; font-weight:400; font-style:normal;&quot;&gt;
-&lt;p style=&quot;-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;br /&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+&lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'.AppleSystemUIFont'; font-size:10pt; font-weight:400; font-style:normal;&quot;&gt;
+&lt;p style=&quot;-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; font-size:12pt;&quot;&gt;&lt;br /&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                         </property>
                         <property name="acceptRichText">
                          <bool>false</bool>
@@ -815,12 +808,24 @@ p, li { white-space: pre-wrap; }
                       </item>
                       <item>
                        <widget class="QPushButton" name="pushButton_addTag">
+                        <property name="font">
+                         <font>
+                          <pointsize>10</pointsize>
+                         </font>
+                        </property>
                         <property name="text">
                          <string>Add Tag</string>
                         </property>
                        </widget>
                       </item>
                      </layout>
+                    </item>
+                    <item>
+                     <widget class="QListWidget" name="listWidget_tag">
+                      <property name="selectionMode">
+                       <enum>QAbstractItemView::ExtendedSelection</enum>
+                      </property>
+                     </widget>
                     </item>
                    </layout>
                   </item>
@@ -916,11 +921,99 @@ p, li { white-space: pre-wrap; }
                   </item>
                  </layout>
                 </item>
+                <item>
+                 <layout class="QVBoxLayout" name="verticalLayout_12" stretch="10,1">
+                  <item>
+                   <layout class="QVBoxLayout" name="verticalLayout_mpl"/>
+                  </item>
+                  <item>
+                   <layout class="QHBoxLayout" name="horizontalLayout_11" stretch="1,1,1,6">
+                    <item>
+                     <widget class="QTextEdit" name="textEdit_roomX">
+                      <property name="sizePolicy">
+                       <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+                        <horstretch>0</horstretch>
+                        <verstretch>0</verstretch>
+                       </sizepolicy>
+                      </property>
+                      <property name="minimumSize">
+                       <size>
+                        <width>30</width>
+                        <height>25</height>
+                       </size>
+                      </property>
+                      <property name="font">
+                       <font>
+                        <pointsize>10</pointsize>
+                       </font>
+                      </property>
+                      <property name="tabChangesFocus">
+                       <bool>true</bool>
+                      </property>
+                      <property name="acceptRichText">
+                       <bool>false</bool>
+                      </property>
+                      <property name="placeholderText">
+                       <string>X</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QTextEdit" name="textEdit_roomY">
+                      <property name="sizePolicy">
+                       <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+                        <horstretch>0</horstretch>
+                        <verstretch>0</verstretch>
+                       </sizepolicy>
+                      </property>
+                      <property name="minimumSize">
+                       <size>
+                        <width>30</width>
+                        <height>25</height>
+                       </size>
+                      </property>
+                      <property name="font">
+                       <font>
+                        <pointsize>10</pointsize>
+                       </font>
+                      </property>
+                      <property name="tabChangesFocus">
+                       <bool>true</bool>
+                      </property>
+                      <property name="acceptRichText">
+                       <bool>false</bool>
+                      </property>
+                      <property name="placeholderText">
+                       <string>Y</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QToolButton" name="toolButton_setRoom">
+                      <property name="text">
+                       <string>Set Room</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <spacer name="horizontalSpacer_3">
+                      <property name="orientation">
+                       <enum>Qt::Horizontal</enum>
+                      </property>
+                      <property name="sizeHint" stdset="0">
+                       <size>
+                        <width>40</width>
+                        <height>20</height>
+                       </size>
+                      </property>
+                     </spacer>
+                    </item>
+                   </layout>
+                  </item>
+                 </layout>
+                </item>
                </layout>
               </widget>
-             </item>
-             <item>
-              <widget class="QWidget" name="widget_mpl" native="true"/>
              </item>
             </layout>
            </item>

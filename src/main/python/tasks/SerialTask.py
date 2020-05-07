@@ -6,7 +6,7 @@ import serial
 import json
 import serial.tools.list_ports
 
-from modules.positSerial import PositSerial
+from modules.PositSerial import PositSerial
 from proto import Settings_pb2
 from google.protobuf.json_format import Parse, ParseDict
 

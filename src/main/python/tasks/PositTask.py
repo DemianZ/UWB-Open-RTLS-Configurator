@@ -43,9 +43,11 @@ class PositTask(QThread):
 
     sig_udp_transmit = pyqtSignal(tuple, list, name='PositTask_UdpTransmit')
 
-    sig_ui_add_anchor_resp = pyqtSignal(str, name='PositTask_AddAnchorResp')
-    sig_ui_add_tag_resp = pyqtSignal(str, name='PositTask_AddTagResp')
+    sig_ui_update_anchor_resp = pyqtSignal(list, name='PositTask_AddAnchorResp')
+    sig_ui_update_tag_resp = pyqtSignal(list, name='PositTask_AddTagResp')
     sig_ui_connect_une_resp = pyqtSignal(list, name='PositTask_ConnectUneResp')
+
+    sig_ui_new_pvt = pyqtSignal(list, name='PositTask_NewPVT')
 
     def __init__(self):
         QThread.__init__(self)
@@ -72,7 +74,7 @@ class PositTask(QThread):
         self.quit()
 
     def restore_default_une_config(self):
-        with open(os.path.join(os.path.dirname(__file__), '../modules/defaultUneConfig.json'), 'r') as f:
+        with open(os.path.join(os.path.dirname(__file__), '../modules/default_une_config.json'), 'r') as f:
             def_config = json.load(f)
             for anchor, pos, in def_config['anchors'].items():
                 self.add_anchor_req([anchor, [str(pos) for pos in pos]])
@@ -122,7 +124,7 @@ class PositTask(QThread):
             self.anchor_une_list[anchor_i][1] = [pos_x, pos_y, pos_z]
         else:
             self.anchor_une_list.append([node_id, [pos_x, pos_y, pos_z]])
-            self.sig_ui_add_anchor_resp.emit(node_id)
+            self.sig_ui_update_anchor_resp.emit(data)
         return
 
     @pyqtSlot(str)
@@ -132,7 +134,7 @@ class PositTask(QThread):
             pass
         else:
             self.tag_une_list.append(UneTag(node_id))
-            self.sig_ui_add_tag_resp.emit(node_id)
+            self.sig_ui_update_tag_resp.emit([node_id, []])
         return
 
     # @brief:   Request from UI to refresh une status list-view
@@ -168,6 +170,7 @@ class PositTask(QThread):
             pos_x = pvt_data[0]
             pos_y = pvt_data[1]
             pos_z = pvt_data[2]
+            self.sig_ui_new_pvt.emit([tag, pvt_data])
             log.debug('TAG{} X:{:f}, Y:{:f}, Z:{:f}'.format(tag, pos_x, pos_y, pos_z))
 
     @pyqtSlot(str, float)    # from UDPServerTask.positNetwork to UneTask

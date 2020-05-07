@@ -3,8 +3,9 @@ import logging as log
 from proto import Monitoring_pb2
 from proto import Settings_pb2
 from modules.wake import Wake
-from modules.positSerial import PositSerial
+from modules.PositSerial import PositSerial
 from google.protobuf.json_format import MessageToDict, ParseDict
+import binascii
 
 # Config logger to write to file
 logger = log.getLogger('data_log')
@@ -116,9 +117,14 @@ class PositNetwork(QObject):
             self.monitoring.ParseFromString(bytes(data))
         except Exception as e:
             return e
-        if self.monitoring.TWR.MessageType == PositNetwork.PB_TWR_MSGTYPE_TWR:
-            self.sig_posit_twr_received.emit(ip, self.monitoring.TWR.Distance)
-            # log.debug(str(ip) + ': ' + str(self.monitoring.TWR.Distance))
+        twr_info = self.monitoring.TWR
+        self.sig_posit_twr_received.emit(ip, twr_info.Distance)
+        log.debug("TWR: AN{}, TG{}, PollNN={}, RespNN={}, FinalNN={}".format(
+            twr_info.NodeID,
+            twr_info.TagID,
+            twr_info.PollNN,
+            twr_info.ResponseNN,
+            twr_info.FinalNN))
         return True
 
     # Requests to device

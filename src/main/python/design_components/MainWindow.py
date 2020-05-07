@@ -6,15 +6,12 @@ from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 
 from designs.mainwindow_ui import Ui_MainWindow
-from modules.mpl import MplCanvas, MplWidget
 from tasks.SerialTask import SerialTask
 from tasks.UDPServerTask import UdpServerTask
 from tasks.UneTask import UneTask, UneNavMethod
 from tasks.PositTask import PositTask
-from modules.positSerial import PositSerial
-
-# from matplotlib.backends.backend_qt5agg import (                      # uncomment for mpl toolbar
-#         FigureCanvas, NavigationToolbar2QT as NavigationToolbar)      # uncomment for mpl toolbar
+from modules.PositSerial import PositSerial
+from modules.GraphWidget import GraphWidget
 
 
 #
@@ -39,11 +36,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         super().__init__()
         self.setupUi(self)
 
-        self.mpl_layout = None
-        self._widget_mpl = None
-        self.mpl_canvas = None
         self.treeview_status_model = None
-        self.init_ui()
+        self.graph = GraphWidget()
+        self.verticalLayout_mpl.addWidget(self.graph)
 
         self.serial_task = SerialTask()
         self.udp_task = UdpServerTask(self)
@@ -55,13 +50,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.connect_ext_signals_ext_slots()
 
     def init_ui(self):
-        # Init matplotlib
-        self.mpl_layout = QVBoxLayout(self.widget_mpl)
-        self._widget_mpl = MplWidget(self.widget_mpl)
-        self.mpl_canvas = MplCanvas()
-        self.mpl_layout.addWidget(self.mpl_canvas)
-        # self.mpl_toolbar = NavigationToolbar(self.mpl_canvas, self)   # uncomment for mpl toolbar
-        # self.mpl_layout.addWidget(self.mpl_toolbar)                   # uncomment for mpl toolbar
+
         pass
 
     # @brief: Connect MW ui signals.
@@ -85,13 +74,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.sig_ui_add_tag_req.connect(lambda node_id: self.posit_task.add_tag_req(node_id))
         self.sig_ui_connect_nodes_req.connect(lambda data: self.posit_task.connect_nodes_req(data))
         self.toolButton_startUne.clicked.connect(self.posit_task.start_une)
-
+        # Network Task
         self.pushButton_netReadConfig.clicked.connect(self.net_get_settings_req)
-
         self.pushButton_netWriteConfig.clicked.connect(self.net_set_settings_req)
         self.pushButton_netDefConfig.clicked.connect(self.net_set_default_settings_req)
-    # @brief: Connect signals from other tasks to local functions.
+        # MPL
+        self.toolButton_setRoom.clicked.connect(
+            lambda: self.graph.set_room(self.textEdit_roomX.toPlainText(), self.textEdit_roomY.toPlainText()))
 
+    # @brief: Connect signals from other tasks to local functions.
     def connect_ext_signals_ui_slots(self):
         # SerialTask + SerialTask.PositSerial
         self.serial_task.sig_serial_list_ports.connect(lambda ports: self.serial_add_ports(ports))
@@ -100,25 +91,35 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.serial_task.posit.sig_posit_settings_received.connect(lambda sets: self.serial_update_settings(sets))
         # UdpTask.PositNetwork
         self.udp_task.posit.sig_ui_update_settings.connect(lambda data: self.network_update_settings(data))
+        self.udp_task.posit.sig_ui_update_settings.connect(lambda data: self.network_update_settings(data))
         self.udp_task.posit.sig_ui_add_device.connect(lambda data: self.network_add_device(data))
         self.udp_task.posit.sig_ui_remove_device.connect(lambda ip: self.network_remove_device(ip))
         self.udp_task.posit.sig_ui_update_device.connect(lambda data: self.network_update_device(data))
         # PositTask
-        self.posit_task.sig_ui_add_anchor_resp.connect(lambda node_id: self.add_anchor_resp(node_id))
-        self.posit_task.sig_ui_add_tag_resp.connect(lambda node_id: self.add_tag_resp(node_id))
+        self.posit_task.sig_ui_update_anchor_resp.connect(lambda data: self.add_anchor_resp(data))
+        self.posit_task.sig_ui_update_tag_resp.connect(lambda data: self.add_tag_resp(data))
         self.posit_task.sig_ui_connect_une_resp.connect(lambda tags: self.connect_nodes_resp(tags))
 
     def connect_ext_signals_ext_slots(self):
-        self.serial_task.posit.sig_serial_write.connect(lambda data: self.serial_task.serial_write(data))
-        self.udp_task.posit.sig_udp_transmit.connect(lambda ip, data: self.udp_task.udp_transmit(ip, data))
-
-        self.posit_task.sig_une_add_new_tag.connect(lambda tag: self.une_task.api_slot_add_tag(tag))
+        self.serial_task.posit.sig_serial_write.connect(
+            lambda data: self.serial_task.serial_write(data))
+        self.udp_task.posit.sig_udp_transmit.connect(
+            lambda ip, data: self.udp_task.udp_transmit(ip, data))
+        self.posit_task.sig_une_add_new_tag.connect(
+            lambda tag: self.une_task.api_slot_add_tag(tag))
         self.posit_task.sig_une_upd_tag_meas.connect(
             lambda tag_id, anchors_meas: self.une_task.api_slot_tag_upd_meas(tag_id, anchors_meas))
         self.une_task.api_sig_new_pvt.connect(
             lambda pvt: self.posit_task.une_new_pvt(pvt))
         self.udp_task.posit.sig_posit_twr_received.connect(
             lambda ip, distance: self.posit_task.net_twr_received(ip, distance))
+        # Graph Widget
+        self.posit_task.sig_ui_update_anchor_resp.connect(
+            lambda data: self.graph.update_anchor(data))
+        self.posit_task.sig_ui_update_tag_resp.connect(
+            lambda data: self.graph.update_tag(data))
+        self.posit_task.sig_ui_new_pvt.connect(
+            lambda data: self.graph.update_tag(data))
 
     # @brief: Start all application tasks.
     def start_tasks(self):
@@ -240,8 +241,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     # @brief: Slot called on response from PositTask to add_tag_req.
     #         Adds tag ID string to tag list tree-view.
-    @pyqtSlot(str)
-    def add_anchor_resp(self, node_id):
+    @pyqtSlot(list)
+    def add_anchor_resp(self, data):
+        node_id = data[0]
         self.listWidget_anchor.addItem(node_id)
 
     # @brief: Slot called on "Add Tag" button click.
@@ -261,7 +263,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     #   Slot called on response from PositTask to add_tag_req.
     #   Adds tag ID string to tag list tree-view.
     @pyqtSlot(str)
-    def add_tag_resp(self, node_id):
+    def add_tag_resp(self, data):
+        node_id = data[0]
         self.listWidget_tag.addItem(node_id)
 
     # @brief:

@@ -54,10 +54,10 @@ class PositSerial(QObject):
 
     @pyqtSlot(dict)
     def set_settings(self, settings_dict):
-        if 'TwrAnchorsForTag' in settings_dict:
-            sett_str = settings_dict['TwrAnchorsForTag']
+        if 'ConnectedAnchors' in settings_dict:
+            sett_str = settings_dict['ConnectedAnchors']
             sett_list = sett_str[1:-1].split(',')
-            settings_dict['TwrAnchorsForTag'] = [int(sett) for sett in sett_list]
+            settings_dict['ConnectedAnchors'] = [int(sett) for sett in sett_list]
 
         settings_pb = Settings_pb2.Settings()
         ParseDict(settings_dict, settings_pb)
