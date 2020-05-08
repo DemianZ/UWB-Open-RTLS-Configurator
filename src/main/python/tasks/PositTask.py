@@ -3,10 +3,11 @@ import atexit
 import logging as log
 import json
 import os
-from tasks.UneTask import UneTag
+from tasks.UneTask import UneTag, UneErrors
 from proto import Settings_pb2
 from google.protobuf.json_format import Parse, ParseDict
 from modules.wake import Wake
+import time
 
 
 #
@@ -39,7 +40,7 @@ from modules.wake import Wake
 
 class PositTask(QThread):
     sig_une_add_new_tag = pyqtSignal(UneTag, name='UneTask_AddTag')
-    sig_une_upd_tag_meas = pyqtSignal(str, dict, name='')
+    sig_une_upd_tag_meas = pyqtSignal(str, float, dict, name='')
 
     sig_udp_transmit = pyqtSignal(tuple, list, name='PositTask_UdpTransmit')
 
@@ -164,14 +165,20 @@ class PositTask(QThread):
                 tag[0].add_anchor(an[0], float(an[1][0]), float(an[1][1]), float(an[1][2]))
             self.sig_une_add_new_tag.emit(tag[0])
 
-    @pyqtSlot(dict)         # from UneTsk
-    def une_new_pvt(self, pvt):
-        for tag, pvt_data in pvt.items():
-            pos_x = pvt_data[0]
-            pos_y = pvt_data[1]
-            pos_z = pvt_data[2]
-            self.sig_ui_new_pvt.emit([tag, pvt_data])
-            log.debug('TAG{} X:{:f}, Y:{:f}, Z:{:f}'.format(tag, pos_x, pos_y, pos_z))
+    @pyqtSlot(list)         # from UneTsk
+    def une_new_pvt(self, tags):
+        for tag in tags:
+            err = tag.get_err_code()
+            dop = tag.get_dops()
+            pvt = tag.get_pvt()
+
+            if err is UneErrors.none:
+                pos = pvt[:3]    # Position [x, y, z]
+                vel = pvt[-1]    # Velocity [m/s]
+                self.sig_ui_new_pvt.emit([tag, pos])
+                log.debug('TAG{} X:{:f}, Y:{:f}, Z:{:f}'.format(tag, pos[0], pos[1], pos[2]))
+            else:
+                log.debug('Error {} TAG{} X:{:f}, Y:{:f}, Z:{:f}'.format(err, tag, pos[0], pos[1], pos[2]))
 
     @pyqtSlot(str, float)    # from UDPServerTask.positNetwork to UneTask
     def net_twr_received(self, ip, distance):
@@ -180,7 +187,7 @@ class PositTask(QThread):
         if ip not in self.epoch_pvt:
             self.epoch_pvt[ip] = [distance, -128]
         if len(self.epoch_pvt) == len(self.anchor_une_list):
-            self.sig_une_upd_tag_meas.emit('1', self.epoch_pvt)
+            self.sig_une_upd_tag_meas.emit('1', time.time(), self.epoch_pvt)
             # log.debug("TWR_EPOCH " + str(self.epoch_cnt) + "\n" + str(self.epoch_pvt))
             self.epoch_pvt = dict()
             self.epoch_cnt += 1
