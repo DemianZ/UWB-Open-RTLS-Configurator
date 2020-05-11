@@ -160,6 +160,7 @@ class PositTask(QThread):
     @pyqtSlot()
     def start_une(self):
         self.une_activated = True
+        # Connect all nodes to une task
         for tag in self.une_list:
             for an in tag[1]:
                 tag[0].add_anchor(an[0], float(an[1][0]), float(an[1][1]), float(an[1][2]))
@@ -180,12 +181,12 @@ class PositTask(QThread):
             else:
                 log.debug('Error {} TAG{} X:{:f}, Y:{:f}, Z:{:f}'.format(err, tag, pos[0], pos[1], pos[2]))
 
-    @pyqtSlot(str, float)    # from UDPServerTask.positNetwork to UneTask
-    def net_twr_received(self, ip, distance):
+    @pyqtSlot(object)    # from UDPServerTask.positNetwork to UneTask
+    def twr_received(self, twr_info):
         if self.une_activated is not True:
             return
-        if ip not in self.epoch_pvt:
-            self.epoch_pvt[ip] = [distance, -128]
+        if twr_info['NodeID'] not in self.epoch_pvt:
+            self.epoch_pvt[twr_info['NodeID']] = [twr_info.distance, -128]
         if len(self.epoch_pvt) == len(self.anchor_une_list):
             self.sig_une_upd_tag_meas.emit('1', time.time(), self.epoch_pvt)
             # log.debug("TWR_EPOCH " + str(self.epoch_cnt) + "\n" + str(self.epoch_pvt))

@@ -10,6 +10,7 @@ from tasks.SerialTask import SerialTask
 from tasks.UDPServerTask import UdpServerTask
 from tasks.UneTask import UneTask, UneNavMethod
 from tasks.PositTask import PositTask
+from tasks.PositCalibrationTask import PositCalibrationTask
 from modules.PositSerial import PositSerial
 from modules.GraphWidget import GraphWidget
 
@@ -31,11 +32,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     sig_ui_add_anchor_req = pyqtSignal(list, name='UI_AddAnchor')
     sig_ui_add_tag_req = pyqtSignal(str, name='UI_AddTag')
     sig_ui_connect_nodes_req = pyqtSignal(list, name='UI_ConnectNodes')
+    sig_ui_start_calibration = pyqtSignal(list, float, name='UI_StartCalibration')
 
     def __init__(self):
         super().__init__()
         self.setupUi(self)
 
+        self.set_status('Loaded')
         self.treeview_status_model = None
         self.graph = GraphWidget()
         self.verticalLayout_mpl.addWidget(self.graph)
@@ -44,14 +47,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.udp_task = UdpServerTask(self)
         self.une_task = UneTask(UneNavMethod.lse)
         self.posit_task = PositTask()
+        self.calib_task = PositCalibrationTask()
 
         self.connect_ui_signals_ext_slots()
         self.connect_ext_signals_ui_slots()
         self.connect_ext_signals_ext_slots()
-
-    def init_ui(self):
-
-        pass
 
     # @brief: Connect MW ui signals.
     def connect_ui_signals_ext_slots(self):
@@ -64,11 +64,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.comboBox_port.currentIndexChanged.connect(
             lambda: self.serial_task.port_changed(self.comboBox_port.currentIndex()))
         self.pushButton_connect.clicked.connect(self.serial_task.open_port)
+        # self.pushButton_connect.clicked.connect(self.serial_task.posit.get_settings)
         self.pushButton_disconnect.clicked.connect(self.serial_task.close_port)
         self.pushButton_serialReadConfig.clicked.connect(self.serial_task.posit.get_settings)
         self.pushButton_serialWriteConfig.clicked.connect(
             lambda: self.serial_task.posit.set_settings(self.get_settings_table_data(self.tableWidget_serialConfig)))
         self.pushButton_serialDefConfig.clicked.connect(self.serial_task.posit.set_default_settings)
+        self.pushButton_serialReboot.clicked.connect(self.serial_task.posit.reboot)
         # Posit Task
         self.sig_ui_add_anchor_req.connect(lambda data: self.posit_task.add_anchor_req(data))
         self.sig_ui_add_tag_req.connect(lambda node_id: self.posit_task.add_tag_req(node_id))
@@ -78,9 +80,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.pushButton_netReadConfig.clicked.connect(self.net_get_settings_req)
         self.pushButton_netWriteConfig.clicked.connect(self.net_set_settings_req)
         self.pushButton_netDefConfig.clicked.connect(self.net_set_default_settings_req)
+        self.pushButton_netReboot.clicked.connect(self.net_reboot_req)
         # MPL
         self.toolButton_setRoom.clicked.connect(
             lambda: self.graph.set_room(self.textEdit_roomX.toPlainText(), self.textEdit_roomY.toPlainText()))
+        # Calibration
+        self.toolButton_startCalibration.clicked.connect(self.start_calibration)
+        self.sig_ui_start_calibration.connect(lambda nodes, dist: self.calib_task.start_calibration(nodes, dist))
 
     # @brief: Connect signals from other tasks to local functions.
     def connect_ext_signals_ui_slots(self):
@@ -99,6 +105,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.posit_task.sig_ui_update_anchor_resp.connect(lambda data: self.add_anchor_resp(data))
         self.posit_task.sig_ui_update_tag_resp.connect(lambda data: self.add_tag_resp(data))
         self.posit_task.sig_ui_connect_une_resp.connect(lambda tags: self.connect_nodes_resp(tags))
+        # Calibration task
+        self.calib_task.sig_update_status.connect(lambda status: self.set_status(status))
 
     def connect_ext_signals_ext_slots(self):
         self.serial_task.posit.sig_serial_write.connect(
@@ -108,11 +116,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.posit_task.sig_une_add_new_tag.connect(
             lambda tag: self.une_task.api_slot_add_tag(tag))
         self.posit_task.sig_une_upd_tag_meas.connect(
-            lambda tag_id, anchors_meas: self.une_task.api_slot_tag_upd_meas(tag_id, anchors_meas))
+            lambda tag_id, epoch, anchors_meas: self.une_task.api_slot_tag_upd_meas(tag_id, epoch, anchors_meas))
         self.une_task.api_sig_new_pvt.connect(
             lambda pvt: self.posit_task.une_new_pvt(pvt))
         self.udp_task.posit.sig_posit_twr_received.connect(
-            lambda ip, distance: self.posit_task.net_twr_received(ip, distance))
+            lambda twr_info: self.posit_task.twr_received(twr_info))
+        self.udp_task.posit.sig_posit_twr_received.connect(
+            lambda twr_info: self.posit_task.twr_received(twr_info))
+        self.udp_task.posit.sig_posit_twr_received.connect(
+            lambda twr_info: self.calib_task.twr_received(twr_info))
+        self.serial_task.posit.sig_posit_twr_received.connect(
+            lambda twr_info: self.calib_task.twr_received(twr_info))
         # Graph Widget
         self.posit_task.sig_ui_update_anchor_resp.connect(
             lambda data: self.graph.update_anchor(data))
@@ -127,12 +141,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.udp_task.start()
         self.posit_task.start()
         self.une_task.start()
+        self.calib_task.start()
 
     def stop_tasks(self):
         self.serial_task.stop()
         self.udp_task.stop()
         self.posit_task.stop()
-        # self.une_task.stop()
+        self.calib_task.stop()
 
     def closeEvent(self, event):
         # reply = QMessageBox.question(self, 'Window Close', 'Are you sure you want to close the window?',
@@ -329,3 +344,20 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         selected_row_i = self.tableWidget_networkList.selectionModel().selectedRows()[0].row()
         ip = self.tableWidget_networkList.item(selected_row_i, 1).text()
         self.udp_task.posit.set_default_settings_req(ip)
+
+    @pyqtSlot()
+    def net_reboot_req(self):
+        selected_row_i = self.tableWidget_networkList.selectionModel().selectedRows()[0].row()
+        ip = self.tableWidget_networkList.item(selected_row_i, 1).text()
+        self.udp_task.posit.reboot_req(ip)
+
+    @pyqtSlot(str)
+    def set_status(self, status):
+        self.statusbar.showMessage(status)
+
+    @pyqtSlot()
+    def start_calibration(self):
+        selected_tags = [item.text() for item in self.listWidget_tag.selectedItems()]
+        selected_anchors = [item.text() for item in self.listWidget_anchor.selectedItems()]
+        nodes = selected_anchors + selected_tags
+        self.sig_ui_start_calibration.emit(nodes, 1.5)

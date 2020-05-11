@@ -25,7 +25,6 @@ from enum import Enum
 import time
 import json
 import numpy as np
-import matplotlib.pyplot as plt
 from numpy.linalg import inv
 import math
 from pympler import asizeof

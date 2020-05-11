@@ -36,7 +36,7 @@ class SerialTask(QThread):
                 try:
                     data = self.serial.read()
                 except serial.SerialException as e:
-                    self.usleep(100)
+                    self.usleep(1)
                     continue
                 if len(data):
                     self.posit.process(data)
@@ -72,7 +72,7 @@ class SerialTask(QThread):
         try:
             self.serial = serial.Serial(
                 port=self.com_port.device,
-                baudrate=19200,
+                baudrate=115200,
                 parity=serial.PARITY_ODD,
                 stopbits=serial.STOPBITS_TWO,
             )

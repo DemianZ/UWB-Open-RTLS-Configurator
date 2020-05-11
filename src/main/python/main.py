@@ -19,5 +19,3 @@ if __name__ == '__main__':
     window.stop_tasks()
     os._exit(0)
     sys.exit(exit_code)
-
-

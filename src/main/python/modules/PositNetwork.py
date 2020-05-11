@@ -1,4 +1,4 @@
-from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot
+from PyQt5.QtCore import QRunnable, pyqtSignal, QObject, pyqtSlot, QThreadPool
 import logging as log
 from proto import Monitoring_pb2
 from proto import Settings_pb2
@@ -27,9 +27,20 @@ logger.setLevel(log.DEBUG)
 #   PositNetwork_CmdTwrRanging:     args: list [ip, {monitoring}]
 #
 class PositNetwork(QObject):
+    class RxCallback(QRunnable):
+        def __init__(self, fn, *args, **kwargs):
+            super().__init__()
+            self.fn = fn
+            self.args = args
+            self.kwargs = kwargs
+
+        @pyqtSlot()
+        def run(self):
+            self.fn(*self.args, **self.kwargs)
+
     sig_posit_settings_received = pyqtSignal(str, dict, name='PositNetwork_PositSettingsReceived')
     sig_posit_hello_received = pyqtSignal(str, name='PositNetwork_PositHelloReceived')
-    sig_posit_twr_received = pyqtSignal(str, float, name='PositNetwork_PositTwrReceived')
+    sig_posit_twr_received = pyqtSignal(object, name='PositNetwork_PositTwrReceived')
 
     sig_udp_transmit = pyqtSignal(str, list, name='PositNetwork_UdpTransmit')
 
@@ -43,9 +54,12 @@ class PositNetwork(QObject):
 
     def __init__(self):
         super().__init__()
+
         self.wake = Wake()
         self.monitoring = Monitoring_pb2.Monitoring()
         self.settings = Settings_pb2.Settings()
+
+        self.thread_pool = QThreadPool()
         self.net_device_list = list()  # [[NodeID, IP, Type, Mode, Rx/Tx, Error]]
 
     def process(self, address, data):
@@ -62,11 +76,21 @@ class PositNetwork(QObject):
     #
     def rx_callback(self, ip, cmd, data):
         if cmd == Wake.CMD_I_AM_HERE_REQ:
-            return self.hello_callback(ip)
+            callback = self.RxCallback(self.hello_callback, ip)
+            self.thread_pool.start(callback)
+
         elif cmd == Wake.CMD_GET_SETTINGS_RESP:
-            return self.get_settings_callback(ip, data)
+            callback = self.RxCallback(self.get_settings_callback, ip, data)
+            self.thread_pool.start(callback)
+
+        if cmd == Wake.CMD_SET_SETTINGS_RESP:
+            callback = self.RxCallback(self.set_settings_callback, ip, data)
+            self.thread_pool.start(callback)
+
         elif cmd == Wake.CMD_TWR_RANGING:
-            return self.twr_ranging_callback(ip, data)
+            callback = self.RxCallback(self.twr_ranging_callback, ip, data)
+            self.thread_pool.start(callback)
+
         else:
             return False
 
@@ -75,6 +99,7 @@ class PositNetwork(QObject):
         if self.check_ip_in_network_list(ip) < 0:
             self.net_device_list.append([None, ip, None, None, None, None])  # empty settings
             self.sig_ui_add_device.emit(self.net_device_list[len(self.net_device_list) - 1])
+            log.debug("NEW HELLO: {}".format(ip))
         return True
 
     # @brief: Slot is fired every time device settings received from server
@@ -99,17 +124,17 @@ class PositNetwork(QObject):
                                            sets['NodeType'],
                                            sets['RTLSMode'],
                                            None, None]
-
             self.sig_ui_update_device.emit(self.net_device_list[i])
 
             for key in PositSerial.ip32_keys:
                 if key in sets:
                     sets[key] = PositSerial.ip32_to_str(int(sets[key]))
-
             self.sig_ui_update_settings.emit(sets)
+
         except Exception as e:
             log.error(e)
             return e
+        log.debug("SETTINGS GET OK: {}".format(ip))
         return True
 
     def twr_ranging_callback(self, ip, data):
@@ -118,14 +143,21 @@ class PositNetwork(QObject):
         except Exception as e:
             return e
         twr_info = self.monitoring.TWR
-        self.sig_posit_twr_received.emit(ip, twr_info.Distance)
-        log.debug("TWR: AN{}, TG{}, PollNN={}, RespNN={}, FinalNN={}".format(
+        self.sig_posit_twr_received.emit(twr_info)
+        log.debug("TWR: NodeID={}, InitID={}, PollNN={}, RespNN={}, FinalNN={}".format(
             twr_info.NodeID,
-            twr_info.TagID,
+            twr_info.InitiatorID,
             twr_info.PollNN,
             twr_info.ResponseNN,
             twr_info.FinalNN))
         return True
+
+    def set_settings_callback(self, ip, data):
+        try:
+            self.monitoring.ParseFromString(bytes(data))
+        except Exception as e:
+            return e
+        log.debug("SETTINGS SET OK: {}".format(ip))
 
     # Requests to device
     def get_settings_req(self, ip):
@@ -133,6 +165,11 @@ class PositNetwork(QObject):
         self.sig_udp_transmit.emit(ip, buf)
 
     def set_settings_req(self, ip, settings_dict):
+        if 'ConnectedAnchors' in settings_dict:
+            sett_str = settings_dict['ConnectedAnchors']
+            sett_list = sett_str[1:-1].split(',')
+            settings_dict['ConnectedAnchors'] = [int(sett) for sett in sett_list]
+
         settings_pb = Settings_pb2.Settings()
         ParseDict(settings_dict, settings_pb)
         settings_string = settings_pb.SerializeToString()
@@ -141,7 +178,12 @@ class PositNetwork(QObject):
 
     def set_default_settings_req(self, ip):
         buf = self.wake.prepare(Wake.CMD_SET_DEF_SETTINGS_REQ, [])
-        self.sig_udp_transmit(ip, buf)
+        self.sig_udp_transmit.emit(ip, buf)
+
+    #
+    def reboot_req(self, ip):
+        buf = self.wake.prepare(Wake.CMD_REBOOT_REQ, [])
+        self.sig_udp_transmit.emit(ip, buf)
 
     def check_ip_in_network_list(self, ip):
         if len(self.net_device_list):

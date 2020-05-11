@@ -23,6 +23,7 @@ class PositSerial(QObject):
 
     sig_serial_write = pyqtSignal(list, name='PositSerial_SettingsWrite')
     sig_posit_settings_received = pyqtSignal(dict, name='PositSerial_SettingsReceived')
+    sig_posit_twr_received = pyqtSignal(object, name='PositSerial_PositTwrReceived')
 
     def __init__(self, tsk_serial):
         super().__init__()
@@ -35,17 +36,25 @@ class PositSerial(QObject):
     def process(self, data):
         cmd_res = self.wake.process(data)
         if cmd_res is not None:
-            log.debug('CMD_' + str(hex(cmd_res['cmd'])) +
-                      ' DATA: ' + str(' '.join('{:02X}'.format(c) for c in cmd_res['data'])))
+            # log.debug('CMD_' + str(hex(cmd_res['cmd'])) +
+            #           ' DATA: ' + str(' '.join('{:02X}'.format(c) for c in cmd_res['data'])))
             self.rx_callback(cmd_res['cmd'], cmd_res['data'])
 
     def rx_callback(self, cmd, data):
         if cmd == Wake.CMD_GET_SETTINGS_RESP:
-            self.get_settings_callback(data)
+            return self.get_settings_callback(data)
+
+        if cmd == Wake.CMD_SET_SETTINGS_RESP:
+            return self.set_settings_callback(data)
+
+        if cmd == Wake.CMD_REBOOT_RESP:
+            return self.reboot_callback(data)
+
         if cmd == Wake.CMD_TWR_RANGING:
-            self.twr_ranging_callback(data)
+            return self.twr_ranging_callback(data)
+
         else:
-            pass
+            return False
 
     @pyqtSlot()
     def get_settings(self):
@@ -70,6 +79,11 @@ class PositSerial(QObject):
         data = self.wake.prepare(Wake.CMD_SET_DEF_SETTINGS_REQ, [])
         self.sig_serial_write.emit(data)
 
+    @pyqtSlot()
+    def reboot(self):
+        data = self.wake.prepare(Wake.CMD_REBOOT_REQ, [])
+        self.sig_serial_write.emit(data)
+
     def get_settings_callback(self, data):
         try:
             self.settings.ParseFromString(bytes(data))
@@ -90,8 +104,32 @@ class PositSerial(QObject):
         except Exception as e:
             return e
 
-        if self.monitoring.twr_message_type == PositSerial.PB_TWR_MSGTYPE_RANGING:
-            logger.debug('twr_ranging_dist:\t' + str(self.monitoring.twr_distance))
+        twr_info = self.monitoring.TWR
+        self.sig_posit_twr_received.emit(twr_info)
+        log.debug("TWR: RespID={}, InitID={}, Distance={} PollNN={}, RespNN={}, FinalNN={}".format(
+            twr_info.NodeID,
+            twr_info.InitiatorID,
+            twr_info.Distance
+            ,
+            twr_info.PollNN,
+            twr_info.ResponseNN,
+            twr_info.FinalNN))
+        return True
+
+    def set_settings_callback(self, data):
+        try:
+            self.settings.ParseFromString(bytes(data))
+        except Exception as e:
+            return e
+        logger.debug('SETTINGS SET OK: {}'.format(self.settings.NodeID))
+        return True
+
+    def reboot_callback(self, data):
+        try:
+            self.settings.ParseFromString(bytes(data))
+        except Exception as e:
+            return e
+        logger.debug('REBOOT OK: {}'.format(self.settings.NodeID))
         return True
 
     @staticmethod

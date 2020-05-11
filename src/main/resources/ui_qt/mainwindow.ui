@@ -315,10 +315,10 @@
              </item>
              <item>
               <layout class="QGridLayout" name="gridLayout">
-               <item row="0" column="0">
-                <widget class="QPushButton" name="pushButton_serialReadConfig">
+               <item row="0" column="2">
+                <widget class="QPushButton" name="pushButton_serialDefConfig">
                  <property name="text">
-                  <string>Read</string>
+                  <string>Default settings</string>
                  </property>
                 </widget>
                </item>
@@ -329,10 +329,17 @@
                  </property>
                 </widget>
                </item>
-               <item row="0" column="2">
-                <widget class="QPushButton" name="pushButton_serialDefConfig">
+               <item row="0" column="0">
+                <widget class="QPushButton" name="pushButton_serialReadConfig">
                  <property name="text">
-                  <string>Reset to default settings</string>
+                  <string>Read</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="0" column="3">
+                <widget class="QPushButton" name="pushButton_serialReboot">
+                 <property name="text">
+                  <string>Reboot</string>
                  </property>
                 </widget>
                </item>
@@ -598,10 +605,10 @@
                 </item>
                 <item>
                  <layout class="QGridLayout" name="gridLayout_2">
-                  <item row="0" column="0">
-                   <widget class="QPushButton" name="pushButton_netReadConfig">
+                  <item row="0" column="2">
+                   <widget class="QPushButton" name="pushButton_netDefConfig">
                     <property name="text">
-                     <string>Read</string>
+                     <string>Default Settings</string>
                     </property>
                    </widget>
                   </item>
@@ -612,10 +619,17 @@
                     </property>
                    </widget>
                   </item>
-                  <item row="0" column="2">
-                   <widget class="QPushButton" name="pushButton_netDefConfig">
+                  <item row="0" column="0">
+                   <widget class="QPushButton" name="pushButton_netReadConfig">
                     <property name="text">
-                     <string>Reset to default settings</string>
+                     <string>Read</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item row="0" column="3">
+                   <widget class="QPushButton" name="pushButton_netReboot">
+                    <property name="text">
+                     <string>Reboot</string>
                     </property>
                    </widget>
                   </item>
@@ -841,6 +855,13 @@ p, li { white-space: pre-wrap; }
                    </widget>
                   </item>
                   <item>
+                   <widget class="QToolButton" name="toolButton_startCalibration">
+                    <property name="text">
+                     <string>Start Calibration</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
                    <widget class="QToolButton" name="toolButton_startUne">
                     <property name="text">
                      <string>Start UNE</string>
@@ -857,7 +878,7 @@ p, li { white-space: pre-wrap; }
                   <item>
                    <widget class="QToolButton" name="toolButton_restUneConfig">
                     <property name="text">
-                     <string>Reset to Default</string>
+                     <string>Load Default</string>
                     </property>
                    </widget>
                   </item>
@@ -867,19 +888,6 @@ p, li { white-space: pre-wrap; }
                      <string>Save as Default</string>
                     </property>
                    </widget>
-                  </item>
-                  <item>
-                   <spacer name="horizontalSpacer_2">
-                    <property name="orientation">
-                     <enum>Qt::Horizontal</enum>
-                    </property>
-                    <property name="sizeHint" stdset="0">
-                     <size>
-                      <width>40</width>
-                      <height>20</height>
-                     </size>
-                    </property>
-                   </spacer>
                   </item>
                  </layout>
                 </item>
