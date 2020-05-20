@@ -27,7 +27,7 @@ class GraphWidget(pg.PlotWidget):
         pos = data[1]
         for plot in self.an_plots:
             if plot[0] == data[0]:
-                self.update_plot_anchor(plot[1], [pos[0], pos[1], pos[2]])
+                self.plot_update_anchor(plot[1], [pos[0], pos[1], pos[2]])
                 return
 
         anchor = self.plot_add_anchor([pos[0], pos[1], pos[2]])
@@ -52,6 +52,8 @@ class GraphWidget(pg.PlotWidget):
             size=10,
             brush=(QColor('red')))
         self.addItem(plot_data_item)
+        self.invertY(True)
+
         return plot_data_item
 
     def plot_add_tag(self, pos):

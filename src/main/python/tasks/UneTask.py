@@ -115,6 +115,7 @@ class UneErrors(Enum):
     none = 0
     not_enough_meas = 1
     too_many_iteration = 2
+    linal_error = 3
 
 
 class UneFlags(Enum):
@@ -342,7 +343,7 @@ class UneTag:
 
     def get_pos_and_dist(self, key, p2):
         """ Get position of anchor by key and distance between anchor and point [x, y, z] """
-        p1 = self.m_anchors.get(key)
+        p1 = self.m_anchors[str(key)]
 
         dX = p1[self.const.x] - p2[self.const.x]
         dY = p1[self.const.y] - p2[self.const.y]
@@ -523,7 +524,12 @@ class Une:
 
             # Using the LSE method for estimating user state vector: mtx_x = [dx, dy, dz]
             mtx_g_trp = mtx_g.transpose()
-            mtx_q = inv(np.matmul(mtx_g_trp, mtx_g))
+            try:
+                mtx_q = inv(np.matmul(mtx_g_trp, mtx_g))
+            except np.linalg.LinAlgError:
+                tag.set_err_code(UneErrors.linal_error)
+                return
+
             mtx_s = np.matmul(mtx_q, mtx_g_trp)
             mtx_x = np.matmul(mtx_s, mtx_y)
 

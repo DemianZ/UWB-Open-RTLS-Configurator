@@ -34,7 +34,7 @@ class SerialTask(QThread):
         while True:
             if self.serial and self.connected:
                 try:
-                    data = self.serial.read()
+                    data = self.serial.readline()
                 except serial.SerialException as e:
                     self.usleep(1)
                     continue
@@ -95,4 +95,4 @@ class SerialTask(QThread):
     @pyqtSlot()
     def serial_write(self, data):
         if self.serial and self.serial.is_open:
-            self.serial.write(data)
+             self.serial.write(data)

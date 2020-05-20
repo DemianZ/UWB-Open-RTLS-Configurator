@@ -173,10 +173,10 @@ class PositTask(QThread):
             dop = tag.get_dops()
             pvt = tag.get_pvt()
 
+            pos = pvt[:3]  # Position [x, y, z]
             if err is UneErrors.none:
-                pos = pvt[:3]    # Position [x, y, z]
                 vel = pvt[-1]    # Velocity [m/s]
-                self.sig_ui_new_pvt.emit([tag, pos])
+                self.sig_ui_new_pvt.emit([tag.get_name(), pos])
                 log.debug('TAG{} X:{:f}, Y:{:f}, Z:{:f}'.format(tag, pos[0], pos[1], pos[2]))
             else:
                 log.debug('Error {} TAG{} X:{:f}, Y:{:f}, Z:{:f}'.format(err, tag, pos[0], pos[1], pos[2]))
@@ -185,11 +185,26 @@ class PositTask(QThread):
     def twr_received(self, twr_info):
         if self.une_activated is not True:
             return
-        if twr_info['NodeID'] not in self.epoch_pvt:
-            self.epoch_pvt[twr_info['NodeID']] = [twr_info.distance, -128]
+        if twr_info.Distance > 100 or twr_info.Distance < -100:
+            return
+        if twr_info.NodeID not in self.epoch_pvt:
+            self.epoch_pvt[twr_info.NodeID] = [twr_info.Distance, -128]
         if len(self.epoch_pvt) == len(self.anchor_une_list):
-            self.sig_une_upd_tag_meas.emit('1', time.time(), self.epoch_pvt)
-            # log.debug("TWR_EPOCH " + str(self.epoch_cnt) + "\n" + str(self.epoch_pvt))
+            self.sig_une_upd_tag_meas.emit('21', time.time(), self.epoch_pvt)
+
+
+            # try:
+            #     with open("./logs/crash_log.json", "r+") as file:
+            #         data = json.load(file)
+            #         data.update({str(self.epoch_cnt): ['21', self.epoch_pvt]})
+            #         file.seek(0)
+            #         json.dump(data, file)
+            # except:
+            #     with open("./logs/crash_log.json", "w") as file:
+            #         json.dump({str(self.epoch_cnt): ['21', self.epoch_pvt]}, file)
+
             self.epoch_pvt = dict()
             self.epoch_cnt += 1
+
+            # log.debug("TWR_EPOCH " + str(self.epoch_cnt) + "\n" + str(self.epoch_pvt))
         return

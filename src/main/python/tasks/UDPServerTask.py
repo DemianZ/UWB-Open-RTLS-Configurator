@@ -43,14 +43,13 @@ class UdpServerTask(QThread):
 
         while True:
             try:
-                data, address = self.sock.recvfrom(1024)  # buffer size is 1024 bytes
+                data, address = self.sock.recvfrom(65435)  # buffer size is 1024 bytes
                 if address not in self.client_list:
                     self.client_list.append(address)
                 if len(data):
                     self.posit.process(address, data)
             except OSError as err:
                 log.error(err)
-            self.usleep(1)
 
     def stop(self):
         self.quit()

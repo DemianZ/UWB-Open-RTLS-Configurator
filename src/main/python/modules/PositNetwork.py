@@ -91,6 +91,9 @@ class PositNetwork(QObject):
             callback = self.RxCallback(self.twr_ranging_callback, ip, data)
             self.thread_pool.start(callback)
 
+        elif cmd == Wake.CMD_REBOOT_RESP:
+            log.debug("REBOOT OK: {}".format(ip))
+
         else:
             return False
 
@@ -100,6 +103,8 @@ class PositNetwork(QObject):
             self.net_device_list.append([None, ip, None, None, None, None])  # empty settings
             self.sig_ui_add_device.emit(self.net_device_list[len(self.net_device_list) - 1])
             log.debug("NEW HELLO: {}".format(ip))
+        buf = self.wake.prepare(Wake.CMD_I_AM_HERE_RESP, [])
+        self.sig_udp_transmit.emit(ip, buf)
         return True
 
     # @brief: Slot is fired every time device settings received from server
@@ -144,9 +149,10 @@ class PositNetwork(QObject):
             return e
         twr_info = self.monitoring.TWR
         self.sig_posit_twr_received.emit(twr_info)
-        log.debug("TWR: NodeID={}, InitID={}, PollNN={}, RespNN={}, FinalNN={}".format(
+        log.debug("TWR: NodeID={}, InitID={}, D={}, PollNN={}, RespNN={}, FinalNN={}".format(
             twr_info.NodeID,
             twr_info.InitiatorID,
+            twr_info.Distance,
             twr_info.PollNN,
             twr_info.ResponseNN,
             twr_info.FinalNN))
