@@ -75,7 +75,7 @@ class PositTask(QThread):
         self.quit()
 
     def restore_default_une_config(self):
-        with open(os.path.join(os.path.dirname(__file__), '../modules/default_une_config.json'), 'r') as f:
+        with open(os.path.join(os.path.dirname(__file__), '../modules/istra_config.json'), 'r') as f:
             def_config = json.load(f)
             for anchor, pos, in def_config['anchors'].items():
                 self.add_anchor_req([anchor, [str(pos) for pos in pos]])
@@ -187,12 +187,13 @@ class PositTask(QThread):
             return
         if twr_info.Distance > 100 or twr_info.Distance < -100:
             return
-        if twr_info.NodeID not in self.epoch_pvt:
-            self.epoch_pvt[twr_info.NodeID] = [twr_info.Distance, -128]
-        if len(self.epoch_pvt) == len(self.anchor_une_list):
-            self.sig_une_upd_tag_meas.emit('21', time.time(), self.epoch_pvt)
+        if twr_info.InitiatorID not in self.epoch_pvt:
+            self.epoch_pvt[twr_info.InitiatorID] = dict()
 
-
+        if twr_info.NodeID not in self.epoch_pvt[twr_info.InitiatorID]:
+            (self.epoch_pvt[twr_info.InitiatorID])[twr_info.NodeID] = [twr_info.Distance, -128]
+        if len(self.epoch_pvt[twr_info.InitiatorID]) >= 4:
+            self.sig_une_upd_tag_meas.emit(str(twr_info.InitiatorID), time.time(), self.epoch_pvt[twr_info.InitiatorID])
             # try:
             #     with open("./logs/crash_log.json", "r+") as file:
             #         data = json.load(file)
@@ -202,8 +203,7 @@ class PositTask(QThread):
             # except:
             #     with open("./logs/crash_log.json", "w") as file:
             #         json.dump({str(self.epoch_cnt): ['21', self.epoch_pvt]}, file)
-
-            self.epoch_pvt = dict()
+            self.epoch_pvt[twr_info.InitiatorID] = dict()
             self.epoch_cnt += 1
 
             # log.debug("TWR_EPOCH " + str(self.epoch_cnt) + "\n" + str(self.epoch_pvt))

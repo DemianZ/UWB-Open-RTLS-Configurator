@@ -15,7 +15,7 @@ class State(Enum):
 
 class PositCalibrationTask(QThread):
 
-    NUM_RAW_TWR_MEASURES = 200
+    NUM_RAW_TWR_MEASURES = 1000
 
     sig_update_status = pyqtSignal(str, name='PositCalibration_UIUpdateStatus') # [node_ids]
 
@@ -63,7 +63,7 @@ class PositCalibrationTask(QThread):
                     self.raw_meas[str(i)][str(j)] = list()
 
         if distance <= 0:
-            self.distance = 1.5        # equal distance between all nodes
+            self.distance = 2.6        # equal distance between all nodes
         else:
             self.distance = distance
 

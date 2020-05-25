@@ -53,6 +53,7 @@ class GraphWidget(pg.PlotWidget):
             brush=(QColor('red')))
         self.addItem(plot_data_item)
         self.invertY(True)
+        self.invertX(True)
 
         return plot_data_item
 
