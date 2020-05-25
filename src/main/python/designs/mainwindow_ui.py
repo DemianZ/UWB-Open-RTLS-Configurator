@@ -384,7 +384,7 @@ class Ui_MainWindow(object):
         self.textEdit_tagId.setFont(font)
         self.textEdit_tagId.setTabChangesFocus(True)
         self.textEdit_tagId.setDocumentTitle("")
-        self.textEdit_tagId.setMarkdown("")
+        # self.textEdit_tagId.setMarkdown("")
         self.textEdit_tagId.setAcceptRichText(False)
         self.textEdit_tagId.setObjectName("textEdit_tagId")
         self.horizontalLayout_7.addWidget(self.textEdit_tagId)
