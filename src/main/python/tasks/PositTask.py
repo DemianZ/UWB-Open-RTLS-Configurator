@@ -193,7 +193,9 @@ class PositTask(QThread):
         if twr_info.NodeID not in self.epoch_pvt[twr_info.InitiatorID]:
             (self.epoch_pvt[twr_info.InitiatorID])[twr_info.NodeID] = [twr_info.Distance, -128]
         if len(self.epoch_pvt[twr_info.InitiatorID]) >= 4:
-            self.sig_une_upd_tag_meas.emit(str(twr_info.InitiatorID), time.time(), self.epoch_pvt[twr_info.InitiatorID])
+            tag_meas = list()
+            tag_meas.append(UneMeas(str(twr_info.InitiatorID), time.time(), self.epoch_pvt[twr_info.InitiatorID]))
+            self.sig_une_upd_tag_meas.emit(tag_meas)
             # try:
             #     with open("./logs/crash_log.json", "r+") as file:
             #         data = json.load(file)

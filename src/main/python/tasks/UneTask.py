@@ -1127,31 +1127,31 @@ class UneTaskTst(QThread):
             for postprocessing
         """
         # # Load data for postprocessing
-        # with open("logs/my_new_log.json", "r") as read_file:
-        #     desc_meas = json.load(read_file)
-        #
-        # # Add all available anchors and their positions
-        # for a_name, a_pos in desc_meas['description']['anchors'].items():
-        #     if len(a_pos) != 3:
-        #         log.debug("-E-: [UneTaskTst::prepare_tag] Invalid anchor position")
-        #         return False
-        #
-        #     # Add the new anchor into the dictionary
-        #     tag.add_anchor(a_name, a_pos[0], a_pos[1], a_pos[2])
-        #
-        # # Fill all measurements dictionary
-        # self.m_pp_meas = desc_meas['measurements']
-
-        # CRASH LOG
-        # Load data for postprocessing
-        with open("logs/crash_log.json", "r") as read_file:
+        with open("logs/my_new_log.json", "r") as read_file:
             desc_meas = json.load(read_file)
 
         # Add all available anchors and their positions
-        tag.add_anchor('11', 0, 0, 0)
-        tag.add_anchor('12', 0, 0, 0)
-        tag.add_anchor('13', 0, 0, 0)
-        tag.add_anchor('14', 0, 0, 0)
+        for a_name, a_pos in desc_meas['description']['anchors'].items():
+            if len(a_pos) != 3:
+                log.debug("-E-: [UneTaskTst::prepare_tag] Invalid anchor position")
+                return False
+
+            # Add the new anchor into the dictionary
+            tag.add_anchor(a_name, a_pos[0], a_pos[1], a_pos[2])
 
         # Fill all measurements dictionary
         self.m_pp_meas = desc_meas['measurements']
+
+        # CRASH LOG
+        # Load data for postprocessing
+        # with open("logs/crash_log.json", "r") as read_file:
+        #     desc_meas = json.load(read_file)
+        #
+        # # Add all available anchors and their positions
+        # tag.add_anchor('11', 0, 0, 0)
+        # tag.add_anchor('12', 0, 0, 0)
+        # tag.add_anchor('13', 0, 0, 0)
+        # tag.add_anchor('14', 0, 0, 0)
+        #
+        # # Fill all measurements dictionary
+        # self.m_pp_meas = desc_meas['measurements']

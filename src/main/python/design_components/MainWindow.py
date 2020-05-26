@@ -138,12 +138,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             lambda data: self.graph.update_tag(data))
 
         # !!! For test. Signal to UNE
-        self.une_tst_task.sig_add_new_tag.connect(self.une_task.api_slot_add_tag)
-        self.une_tst_task.sig_upd_tag_meas.connect(self.une_task.api_slot_tag_upd_meas)
-        self.une_tst_task.sig_calib_start.connect(self.une_task.api_slot_calibrate)
-        # Signal from UNE
-        self.une_task.api_sig_new_pvt.connect(self.une_tst_task.slot_new_pvt)
-        self.une_task.api_sig_calib_finished.connect(self.une_tst_task.slot_calib_finished)
+        # self.une_tst_task.sig_add_new_tag.connect(self.une_task.api_slot_add_tag)
+        # self.une_tst_task.sig_upd_tag_meas.connect(self.une_task.api_slot_tag_upd_meas)
+        # self.une_tst_task.sig_calib_start.connect(self.une_task.api_slot_calibrate)
+        # # Signal from UNE
+        # self.une_task.api_sig_new_pvt.connect(self.une_tst_task.slot_new_pvt)
+        # self.une_task.api_sig_calib_finished.connect(self.une_tst_task.slot_calib_finished)
 
     # @brief: Start all application tasks.
     def start_tasks(self):
@@ -153,7 +153,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.une_task.start()
         self.calib_task.start()
         # !!! For Test
-        self.une_tst_task.start()
+        # self.une_tst_task.start()
 
     def stop_tasks(self):
         self.serial_task.stop()
