@@ -30,12 +30,52 @@ import math
 from pympler import asizeof
 
 
+class UneMeas:
+    """ This class is used for transmitting measurements
+        to UneTask signal
+    """
+
+    _tag_name = ''    # Name of the tag
+    _meas_time = 0    # Time of measurement
+    _meas = dict()    # Dictionary of measurements {'anchor_name':[meas1, meas2,..],...}
+
+    def __init__(self, tag_name, meas_time, meas_dict):
+        self._tag_name = tag_name
+        self._meas_time = meas_time
+        self._meas = meas_dict
+
+    @property
+    def name(self):
+        """ Get tag name to identify measurements """
+        return self._tag_name
+
+    @property
+    def meas_time(self):
+        """ Get measurements time (UTC) """
+        return self._meas_time
+
+    @meas_time.setter
+    def meas_time(self, t):
+        """ Set measurements time (UTC) """
+        self._meas_time = t
+
+    @property
+    def meas(self):
+        """ Get measurements dictionary """
+        return self._meas
+
+    @meas.setter
+    def meas(self, m):
+        """ Set measurements dictionary """
+        self._meas = m
+
+
 class UneConst:
     """ This class contains different constant values
         which are used in main class of UNE
     """
 
-    _epoch_period = 0.001
+    _epoch_period = 2
     _meas_min = 3
     _lse_max_iter = 9
     _pvt_length = 3
@@ -48,10 +88,11 @@ class UneConst:
     _YV = 5
     _ZV = 6
     _NV = 7
+    _calib_meas_min_len = 200
 
     @property
     def epoch_period(self):
-        """ Epoch period in seconds """
+        """ Epoch period in milliseconds """
         return self._epoch_period
 
     @property
@@ -109,6 +150,11 @@ class UneConst:
         """ Array index. Euclidean norm of velocity vector """
         return self._NV
 
+    @property
+    def calib_meas_min_len(self):
+        """ Minimum number of measurements for calibrating """
+        return self._calib_meas_min_len
+
 
 class UneErrors(Enum):
     """ Enumerator class describing errors in the UNE module """
@@ -125,6 +171,8 @@ class UneFlags(Enum):
     new_pvt_is_ready = 3  # If set, a new PVT is available
     compute_is_done = 4   # If set, computation for all tags has been done
     tag_extend_info = 5   # Flag for tag to send adding some information to PVT: DOP
+    calib_start = 6       # Flag to start calibrating process
+    calib_finished = 7    # Flag is set when calibration is finished
 
 
 class UneNavMethod(Enum):
@@ -369,80 +417,87 @@ class Une:
         to describe states of tag and to control it
     """
     # Properties
-    m_nav_method = UneNavMethod.lse
+    _nav_method = UneNavMethod.lse
 
     # Auxiliary variables
-    m_num_of_pt_prm = 3     # 3 parameters now: [x, y, z]
-    m_num_of_v_prm = 3      # 3 parameters: [xv, yv, zv]
-    m_pos_err = 0.001       # Error threshold between the previous and current computation steps to stop computation [m]
+    _num_of_pt_prm = 3     # 3 parameters now: [x, y, z]
+    _num_of_v_prm = 3      # 3 parameters: [xv, yv, zv]
+    _pos_err = 0.001       # Error threshold between the previous and current computation steps to stop computation [m]
 
-    const = UneConst()
+    _const = UneConst()
+
+    # For antenna delay estimation
+    _calib_info = dict()
+    _calib_meas = dict()
+    _calib_rslt = list()
 
     # Flags
-    m_flg_compute_is_done = False
+    _flg_compute_is_done = False
+    _flg_calib_start = False
+    _flg_calib_finished = False
 
     # Indices of measurements
-    m_ind_dist = 0
-    m_ind_cnr = 1
+    _ind_dist = 0
+    _ind_cnr = 1
 
     # List of tags
-    m_tags = list()
+    _tags = list()
 
     def __init__(self, nav_method):
         """ The constructor.
             To choose nav_method you should use
             the UneNavMethod enumerator.
         """
-        self.m_nav_method = nav_method
+        self._nav_method = nav_method
 
     def add_tag(self, tag_new):
         """ Method to add new tag """
-        for tag in self.m_tags:
+        for tag in self._tags:
             if tag_new.get_name() == tag.get_name():
                 log.debug('-W- [Une::add_new_tag] Tag {} has already added'.format(tag_new.get_name()))
                 return -1
 
-        self.m_tags.append(tag_new)
+        self._tags.append(tag_new)
 
         # Return current tag object
         return 0
 
     def get_tag(self, name):
         """ Method to get one tag object """
-        for tag in self.m_tags:
+        for tag in self._tags:
             if name == tag.get_name():
                 return tag
         return None
 
     def get_tags(self):
         """ Method to get tags list """
-        return self.m_tags
+        return self._tags
 
     def rem_tag(self, name):
         """ Method to remove tag from tags list """
-        for tag in self.m_tags:
+        for tag in self._tags:
             if name == tag.get_name():
-                self.m_tags.remove(tag)
+                self._tags.remove(tag)
 
     def clr_tags(self):
         """ Method to clear tags list """
-        self.m_tags.clear()
+        self._tags.clear()
 
     def get_position(self):
         """ Comment... """
 
         # Get PVT for all tags in the list m_tags
-        for tag in self.m_tags:
+        for tag in self._tags:
             # If need to compute new tag position
             if tag.get_flags(UneFlags.get_new_pvt) is True:
 
                 # tag.tic()
 
-                if self.m_nav_method == UneNavMethod.lse:
+                if self._nav_method == UneNavMethod.lse:
                     self.get_position_lse(tag)
-                elif self.m_nav_method == UneNavMethod.weighted_lse:
+                elif self._nav_method == UneNavMethod.weighted_lse:
                     self.get_position_wlse(tag)
-                elif self.m_nav_method == UneNavMethod.Kalman:
+                elif self._nav_method == UneNavMethod.Kalman:
                     self.get_position_kalman(tag)
 
                 # toc_t = tag.toc()
@@ -462,10 +517,10 @@ class Une:
             x - tag state vector (position, velocity,...)
          """
         num_anchors = len(tag.get_anchors())
-        num_max_iteration = self.const.lse_max_iter
+        num_max_iteration = self._const.lse_max_iter
         flg_stop_computation = False
 
-        if num_anchors < self.const.meas_min:
+        if num_anchors < self._const.meas_min:
             log.debug("-E-: [UneTwr::get_position_lse] Not enough anchors for tag: {}".format(tag.get_name()))
             tag.set_pvt(0, 0, 0)
             tag.set_err_code(UneErrors.not_enough_meas)
@@ -476,10 +531,10 @@ class Une:
         meas_prev = tag.get_meas_prev()
 
         # Tag state vector
-        mtx_x = np.zeros(self.m_num_of_pt_prm)
+        mtx_x = np.zeros(self._num_of_pt_prm)
 
         # Tag state vector
-        mtx_v = np.zeros(self.m_num_of_v_prm)
+        mtx_v = np.zeros(self._num_of_v_prm)
 
         # Geometry matrix
         mtx_g = np.zeros((num_anchors, 3))
@@ -516,8 +571,8 @@ class Une:
                 # Get difference between previous and current distances to compute error in current user position
                 d_err = d_prev - a_meas[0]
 
-                # Filling geometry and measurements matrices to
-                # compute errors of user position, velocity and time [dx, dy, dz, dt] [dvx, dvy, dvz]
+                # Filling geometry and measurements matrices for
+                # computing errors of user position, velocity and time [dx, dy, dz, dt] [dvx, dvy, dvz]
                 mtx_g[cnt_meas] = [x / d_prev, y / d_prev, z / d_prev]
                 mtx_y[cnt_meas] = d_err
                 cnt_meas += 1
@@ -525,7 +580,7 @@ class Une:
             # Using the LSE method for estimating user state vector: mtx_x = [dx, dy, dz]
             mtx_g_trp = mtx_g.transpose()
             try:
-                mtx_q = inv(np.matmul(mtx_g_trp, mtx_g))
+                mtx_q = np.linalg.inv(np.matmul(mtx_g_trp, mtx_g))
             except np.linalg.LinAlgError:
                 tag.set_err_code(UneErrors.linal_error)
                 return
@@ -535,26 +590,26 @@ class Une:
 
             # Update tag position using estimated errors in mtx_k
             p_prev = [
-                tag_pvt_prev[self.const.x],
-                tag_pvt_prev[self.const.y],
-                tag_pvt_prev[self.const.z]
+                tag_pvt_prev[self._const.x],
+                tag_pvt_prev[self._const.y],
+                tag_pvt_prev[self._const.z]
             ]
 
-            tag.upd_pos(mtx_x[self.const.x], mtx_x[self.const.y], mtx_x[self.const.z], 0)
+            tag.upd_pos(mtx_x[self._const.x], mtx_x[self._const.y], mtx_x[self._const.z], 0)
 
             # Get tag position attempted on the current step
             tag_pos_curr = tag.get_pvt()
 
             # List to save tag position
             p_curr = [
-                tag_pos_curr[self.const.x],
-                tag_pos_curr[self.const.y],
-                tag_pos_curr[self.const.z]
+                tag_pos_curr[self._const.x],
+                tag_pos_curr[self._const.y],
+                tag_pos_curr[self._const.z]
             ]
 
             # Computation of the error between the previous and current position estimates
             # and if it less than threshold then stop computation
-            if tag.get_dist(p_prev, p_curr) <= self.m_pos_err:
+            if tag.get_dist(p_prev, p_curr) <= self._pos_err:
                 flg_stop_computation = True
 
             # Go to the next iteration step (above) ^^^
@@ -594,22 +649,255 @@ class Une:
         pos = [0, 0, 0]
         return UneErrors.none
 
+    def calibration_init(self, info, meas):
+        """ Method to check data for calibrating, updating local dictionaries with info/meas
+            and setting flag UneFlags.calib_start if there isn't any errors
+
+            info: { triangle side length [m]: ['id1', 'id2', 'id3']}
+            meas: {
+                    'id1':
+                    {
+                      'id2': [dist1, dist2,...],
+                      'id3': [dist1, dist2,...]
+                    },
+                    'id2':
+                    {
+                      'id1': [dist1, dist2,...],
+                      'id3': [dist1, dist2,...]
+                    },
+                    'id3':
+                    {
+                      'id1': [dist1, dist2,...],
+                      'id2': [dist1, dist2,...]
+                    }
+                  }
+        """
+        key = list(info.keys())[0]
+
+        if len(info[key]) != 3:
+            log.debug('-E-: [Une::calibration_init] Invalid init: {}'.format(info))
+            return False
+
+        id1 = info[key][0]
+        id2 = info[key][1]
+        id3 = info[key][2]
+
+        if (id1 not in meas) or (id2 not in meas) or (id3 not in meas):
+            log.debug('-E-: [Une::calibration_init] meas doesnt have all the ids')
+            return False
+
+        if (id2 not in meas[id1]) or (id3 not in meas[id1]):
+            log.debug('-E-: [Une::calibration_init] meas[id1] doesnt have all the ids')
+            return False
+
+        if (id1 not in meas[id2]) or (id3 not in meas[id2]):
+            log.debug('-E-: [Une::calibration_init] meas[id2] doesnt have all the ids')
+            return False
+
+        if (id1 not in meas[id3]) or (id2 not in meas[id3]):
+            log.debug('-E-: [Une::calibration_init] meas[id3] doesnt have all the ids')
+            return False
+
+        if len(meas[id1][id2]) < self._const.calib_meas_min_len:
+            log.debug('-E-: [Une::calibration_init] Not enough measurements')
+            return False
+
+        self._calib_info = info
+        self._calib_meas = meas
+
+        # If there isn't errors, then start calibrating
+        self.set_flags(UneFlags.calib_start)
+
+        return True
+
+    def calibration(self):
+        """ Method to estimate antennas delay.
+            The Kalman filter is used to estimate the antenna delays
+            of three devices arranged in an equilateral triangle.
+
+            Note
+            -------
+            !!! NOTE: This method is called automatically.
+            You only should call the calibration_init method.
+        """
+
+        log.debug('-I- [Une::_calibration] Start calibration')
+
+        const = UneConst
+
+        key = list(self._calib_info.keys())[0]
+
+        # Get init parameters
+        D = float(key)
+        id1 = self._calib_info[key][0]
+        id2 = self._calib_info[key][1]
+        id3 = self._calib_info[key][2]
+
+        # Number of measurements
+        N = len(self._calib_meas[id1][id2])
+
+        # Auxiliary variables
+        nWay = 6
+        nPrm = 8
+        lspd = 299792485         # Light speed[m / s]
+        posc = np.zeros((N, 2))  # Position after compensating the antenna delays
+
+        # To get system unit from distance
+        DWT_TIME_UNITS = (1.0 / 499.2e6 / 128.0)
+
+        # Devices position
+        class Point:
+            _x = 0
+            _y = 0
+
+            def __init__(self, x, y):
+                self._x = x
+                self._y = y
+
+            @property
+            def x(self):
+                return self._x
+
+            @x.setter
+            def x(self, val):
+                self._x = val
+
+            @property
+            def y(self):
+                return self._y
+
+            @y.setter
+            def y(self, val):
+                self._y = val
+
+        p1 = Point(1.0, 1.0)
+        p2 = Point(p1.x + D, p1.y)
+        p3 = Point(p1.x + D / 2, p1.y + np.sqrt(D**2 - (D / 2)**2))
+        ref = Point(p1.x + D / 2, p1.y + np.sqrt(D**2 - (D / 2)**2) / 3)
+
+        # Getting standard deviation of measurement
+        meas_std = np.std(self._calib_meas[id1][id2])
+
+        # Define variables for init state
+        P_INIT = 10.0
+        R_INIT = meas_std**2
+        Q_INIT_ANT = 1.0e-9
+        Q_INIT_POS = 1.0e-5
+
+        # Main matrices
+        X = np.zeros(nPrm)
+        F = np.diag(np.ones(nPrm))
+        I = np.diag(np.ones(nPrm))
+        H = np.zeros((nWay, nPrm))
+        Y = np.zeros(nWay)
+        P = np.diag(np.ones(nPrm) * P_INIT)
+        Q = np.diag(np.hstack([np.ones(2) * Q_INIT_POS, np.ones(6) * Q_INIT_ANT]))
+        R = np.diag(np.ones(nWay) * R_INIT)
+
+        # Coefficient to recomupte range error to distance error
+        h = 1 / (2 * np.cos(30 * np.pi / 180))
+
+        # Range to triangle centroid
+        d = D * h
+        x1 = (p1.x - ref.x) / d
+        y1 = (p1.y - ref.y) / d
+        x2 = (p2.x - ref.x) / d
+        y2 = (p2.y - ref.y) / d
+        x3 = (p3.x - ref.x) / d
+        y3 = (p3.y - ref.y) / d
+
+        # Init the measurement matrix
+        H[0][:] = [x1, y1, h, 0, 0, h, 0, 0]
+        H[1][:] = [x2, y2, 0, 0, h, 0, 0, h]
+        H[2][:] = [x3, y3, 0, h, 0, 0, h, 0]
+        H[3][:] = [x1, y1, h, 0, 0, 0, 0, h]
+        H[4][:] = [x3, y3, 0, 0, 0, h, h, 0]
+        H[5][:] = [x2, y2, 0, h, h, 0, 0, 0]
+
+        for i in range(N):
+
+            # Updating the measurement vector
+            Y[0] = self._calib_meas[id1][id2][i] * h - d
+            Y[1] = self._calib_meas[id2][id3][i] * h - d
+            Y[2] = self._calib_meas[id3][id1][i] * h - d
+            Y[3] = self._calib_meas[id1][id3][i] * h - d
+            Y[4] = self._calib_meas[id3][id2][i] * h - d
+            Y[5] = self._calib_meas[id2][id1][i] * h - d
+
+            # Step1. Predicting
+            X = np.matmul(F, X)
+            P = np.matmul(np.matmul(F, P), F.transpose()) + Q
+
+            # Step2. Computing the Kalman gain
+            try:
+                S = np.linalg.inv(np.matmul(np.matmul(H, P), H.transpose()) + R)
+            except np.linalg.LinAlgError as e:
+                log.debug('-E- [Une::calibration] Error: {}'.format(e))
+
+            K = np.matmul(np.matmul(P, H.transpose()), S)
+
+            # Step3. Updating the state vector and the process covariance matrix
+            X = X + np.matmul(K, Y - np.matmul(H, X))
+            P = np.matmul((I - np.matmul(K, H)), P)
+
+            # Save current position estimate for plotting
+            posc[i][:] = [ref.x + X[0], ref.y + X[1]]
+
+            # Reset position in state vector
+            X[:2] = 0
+
+        # Change distance to system unit
+        for i in range(2, 8):
+            X[i] = round(X[i] / lspd / DWT_TIME_UNITS)
+
+        log.debug('-I- [Une::_calibration] Result (tx1, rx1, tx2, rx2, tx3, rx3): {}'.format(X[2:]))
+
+        # The result (tx1, rx1, tx2, rx2, tx3, rx3)
+        self._calib_rslt = X[2:]
+
+        self.set_flags(UneFlags.calib_finished)
+
+    def get_calib_result(self):
+        """ Return list of antenna delays (tx1, rx1, tx2, rx2, tx3, rx3) """
+        return list(self._calib_rslt)
+
     def set_flags(self, flg, val=True):
-        """ Method to set flags """
+        """ Method to set flags
+
+            flg: UneFlags field
+            val: Boolean value
+        """
         if (val is not True) and (val is not False):
             log.debug('-E- [Une::set_flags] Incorrect argument value: {}'.format(val))
 
         if flg is UneFlags.compute_is_done:
-            self.m_flg_compute_is_done = val
+            self._flg_compute_is_done = val
+        elif flg is UneFlags.calib_start:
+            self._flg_calib_start = val
+        elif flg is UneFlags.calib_finished:
+            self._flg_calib_finished = val
         else:
             log.debug('-E- [Une::set_flags] Flag {} not supported'.format(flg))
 
     def get_flags(self, flg):
-        """ Method to get flags """
+        """ Method to get flags
+
+            flg: UneFlags field
+        """
         if flg is UneFlags.compute_is_done:
-            res = self.m_flg_compute_is_done
+            res = self._flg_compute_is_done
             # Reset flag after request
-            self.m_flg_compute_is_done = False
+            self._flg_compute_is_done = False
+            return res
+        elif flg is UneFlags.calib_start:
+            res = self._flg_calib_start
+            # Reset flag after request
+            self._flg_calib_start = False
+            return res
+        elif flg is UneFlags.calib_finished:
+            res = self._flg_calib_finished
+            # Reset flag after request
+            self._flg_calib_finished = False
             return res
         else:
             log.debug('-E- [UneTwrTask::get_flags] Flag {} not supported'.format(flg))
@@ -621,8 +909,10 @@ class UneTask(QThread):
         More details.
     """
     # Define API signals
-    # This defines a signal that takes one argument: list of UneTag objects that were used in computation
+    # This defines a signal that takes one argument: list of UneTag objects that are used in computation
     api_sig_new_pvt = pyqtSignal(list)
+    # This defines a signal that takes one argument: list of antenna delays (tx1, rx1, tx2, rx2, tx3, rx3)
+    api_sig_calib_finished = pyqtSignal(list)
 
     # UWB Navigation Engine object
     une = None
@@ -646,10 +936,12 @@ class UneTask(QThread):
             ..........................
         """
         while True:
-            self.msleep(int(self.const.epoch_period * 1000))
+            self.msleep(int(self.const.epoch_period))
+
             # Compute position
             self.une.get_position()
 
+            # Check flags
             if self.une.get_flags(UneFlags.compute_is_done):
 
                 tags_to_send = list()
@@ -663,30 +955,74 @@ class UneTask(QThread):
                     # Signal emission with a new PVT vector for all tags used in current epoch
                     self.api_sig_new_pvt.emit(tags_to_send)
 
+            if self.une.get_flags(UneFlags.calib_start):
+                self.une.calibration()
+            elif self.une.get_flags(UneFlags.calib_finished):
+                self.api_sig_calib_finished.emit(self.une.get_calib_result())
+
     def stop(self):
         self.quit()
+
+    @pyqtSlot(dict, dict)
+    def api_slot_calibrate(self, info, meas):
+        """ Slot method to start calibrating process
+            to find antenna delays.
+
+            Note
+            ______
+            200 measurements for each pair minimum
+            ------
+            info: { triangle side length [m]: ['id1', 'id2', 'id3']}
+            meas: {
+                    'id1':
+                    {
+                      'id2': [dist1, dist2,...],
+                      'id3': [dist1, dist2,...]
+                    },
+                    'id2':
+                    {
+                      'id1': [dist1, dist2,...],
+                      'id3': [dist1, dist2,...]
+                    },
+                    'id3':
+                    {
+                      'id1': [dist1, dist2,...],
+                      'id2': [dist1, dist2,...]
+                    }
+                  }
+        """
+
+        self.une.calibration_init(info, meas)
 
     @pyqtSlot(UneTag)
     def api_slot_add_tag(self, tag):
         """ Slot method to add new tag in UNE.
             If tag exist then do nothing.
+
+            tag: UneTag object with unique name
         """
         self.une.add_tag(tag)
         log.debug('-I- [UneTask::api_slot_add_tag] Add tag: {}'.format(tag.get_name()))
 
-    @pyqtSlot(str, float, dict)
-    def api_slot_tag_upd_meas(self, tag_name, epoch, meas):
+    @pyqtSlot(list)
+    def api_slot_tag_upd_meas(self, meas_list):
         """ Slot method to add tag measurements.
             If tag doesn't exist then do nothing.
-        """
-        tag = self.une.get_tag(tag_name)
 
-        if tag is not None:
+            meas_list: list of UneMeas objects
+        """
+        for meas in meas_list:
+            tag = self.une.get_tag(meas.name)
+
+            if tag is None:
+                log.debug('-I- [UneTask::api_slot_tag_upd_meas] Tag {} does not exist'.format(meas.name))
+                continue
+
             # Set epoch time
-            tag.set_epoch_curr(epoch)
+            tag.set_epoch_curr(meas.meas_time)
 
             # Add measurements
-            for a_name, m_list in meas.items():
+            for a_name, m_list in meas.meas.items():
                 tag.add_meas(a_name, m_list[0], m_list[1])
 
             # Set flag to start computation of the PVT
@@ -704,8 +1040,12 @@ class UneTaskTst(QThread):
     # Define API signals
     # This defines a signal for adding new tag in UNE, it takes one argument: UneTag
     sig_add_new_tag = pyqtSignal(UneTag)
-    # This defines a signal for updating tag measurement: tag name, {'anchor': [distance, snr], ...}
-    sig_upd_tag_meas = pyqtSignal(str, float, dict)
+
+    # This defines a signal for updating tag measurements.
+    # Arguments: list of UneMeas objects
+    sig_upd_tag_meas = pyqtSignal(list)
+    # To start calibration
+    sig_calib_start = pyqtSignal(dict, dict)
 
     # !!! For test
     m_pp_meas = dict()
@@ -731,18 +1071,34 @@ class UneTaskTst(QThread):
         # Emit signal for adding a new tag in UNE
         self.sig_add_new_tag.emit(my_tag)
 
+        # Load data for calibrating
+        with open("logs/calib_data_5_4.json", "r") as read_file:
+            calib_meas = json.load(read_file)
+
+        info = {2.6: ['12', '13', '14']}
+        meas = calib_meas
+        self.sig_calib_start.emit(info, meas)
+
         flg_compute = True
         while True:
             self.msleep(100)
             if flg_compute is True:
                 flg_compute = False
                 for epoch in self.m_pp_meas:
-                    self.msleep(100)
+                    self.msleep(1000)
 
-                    log.debug('-I- [UneTaskTst::run] Compute tag PVT. UTC:', epoch)
+                    log.debug('-I- [UneTaskTst::run] Compute tag PVT. UTC: {}'.format(epoch))
 
                     # Emit signal for updating tag measurements in UNE
-                    self.sig_upd_tag_meas.emit('My tag', float(epoch), self.m_pp_meas[epoch])
+                    tag_meas = list()
+                    tag_meas.append(UneMeas('My tag', float(epoch), self.m_pp_meas[epoch]))
+                    self.sig_upd_tag_meas.emit(tag_meas)
+
+    @pyqtSlot(list)
+    def slot_calib_finished(self, result):
+        """ Slot method to get result of antenna delay calibration """
+        log.debug('-I- [UneTaskTst::slot_calib_finished] Antenna delay calibration result: {}'.format(result))
+        pass
 
     @pyqtSlot(list)
     def slot_new_pvt(self, tags):
@@ -770,18 +1126,32 @@ class UneTaskTst(QThread):
             Load description and measurements from JSON file
             for postprocessing
         """
+        # # Load data for postprocessing
+        # with open("logs/my_new_log.json", "r") as read_file:
+        #     desc_meas = json.load(read_file)
+        #
+        # # Add all available anchors and their positions
+        # for a_name, a_pos in desc_meas['description']['anchors'].items():
+        #     if len(a_pos) != 3:
+        #         log.debug("-E-: [UneTaskTst::prepare_tag] Invalid anchor position")
+        #         return False
+        #
+        #     # Add the new anchor into the dictionary
+        #     tag.add_anchor(a_name, a_pos[0], a_pos[1], a_pos[2])
+        #
+        # # Fill all measurements dictionary
+        # self.m_pp_meas = desc_meas['measurements']
+
+        # CRASH LOG
         # Load data for postprocessing
-        with open("logs/my_new_log.json", "r") as read_file:
+        with open("logs/crash_log.json", "r") as read_file:
             desc_meas = json.load(read_file)
 
         # Add all available anchors and their positions
-        for a_name, a_pos in desc_meas['description']['anchors'].items():
-            if len(a_pos) != 3:
-                log.debug("-E-: [UneTaskTst::prepare_tag] Invalid anchor position")
-                return False
-
-            # Add the new anchor into the dictionary
-            tag.add_anchor(a_name, a_pos[0], a_pos[1], a_pos[2])
+        tag.add_anchor('11', 0, 0, 0)
+        tag.add_anchor('12', 0, 0, 0)
+        tag.add_anchor('13', 0, 0, 0)
+        tag.add_anchor('14', 0, 0, 0)
 
         # Fill all measurements dictionary
         self.m_pp_meas = desc_meas['measurements']

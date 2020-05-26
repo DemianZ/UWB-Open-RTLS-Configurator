@@ -3,7 +3,7 @@ import atexit
 import logging as log
 import json
 import os
-from tasks.UneTask import UneTag, UneErrors
+from tasks.UneTask import UneTag, UneErrors, UneMeas
 from proto import Settings_pb2
 from google.protobuf.json_format import Parse, ParseDict
 from modules.wake import Wake
@@ -40,7 +40,7 @@ import time
 
 class PositTask(QThread):
     sig_une_add_new_tag = pyqtSignal(UneTag, name='UneTask_AddTag')
-    sig_une_upd_tag_meas = pyqtSignal(str, float, dict, name='')
+    sig_une_upd_tag_meas = pyqtSignal(list, name='')
 
     sig_udp_transmit = pyqtSignal(tuple, list, name='PositTask_UdpTransmit')
 

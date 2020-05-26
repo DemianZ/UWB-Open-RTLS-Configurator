@@ -8,7 +8,7 @@ from PyQt5.QtCore import *
 from designs.mainwindow_ui import Ui_MainWindow
 from tasks.SerialTask import SerialTask
 from tasks.UDPServerTask import UdpServerTask
-from tasks.UneTask import UneTask, UneNavMethod
+from tasks.UneTask import UneTask, UneNavMethod, UneTaskTst
 from tasks.PositTask import PositTask
 from tasks.PositCalibrationTask import PositCalibrationTask
 from modules.PositSerial import PositSerial
@@ -48,6 +48,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.une_task = UneTask(UneNavMethod.lse)
         self.posit_task = PositTask()
         self.calib_task = PositCalibrationTask()
+        # !!! For Test
+        self.une_tst_task = UneTaskTst()
 
         self.connect_ui_signals_ext_slots()
         self.connect_ext_signals_ui_slots()
@@ -116,7 +118,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.posit_task.sig_une_add_new_tag.connect(
             lambda tag: self.une_task.api_slot_add_tag(tag))
         self.posit_task.sig_une_upd_tag_meas.connect(
-            lambda tag_id, epoch, anchors_meas: self.une_task.api_slot_tag_upd_meas(tag_id, epoch, anchors_meas))
+            lambda meas_list: self.une_task.api_slot_tag_upd_meas(meas_list))
         self.une_task.api_sig_new_pvt.connect(
             lambda pvt: self.posit_task.une_new_pvt(pvt))
         self.udp_task.posit.sig_posit_twr_received.connect(
@@ -135,6 +137,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.posit_task.sig_ui_new_pvt.connect(
             lambda data: self.graph.update_tag(data))
 
+        # !!! For test. Signal to UNE
+        self.une_tst_task.sig_add_new_tag.connect(self.une_task.api_slot_add_tag)
+        self.une_tst_task.sig_upd_tag_meas.connect(self.une_task.api_slot_tag_upd_meas)
+        self.une_tst_task.sig_calib_start.connect(self.une_task.api_slot_calibrate)
+        # Signal from UNE
+        self.une_task.api_sig_new_pvt.connect(self.une_tst_task.slot_new_pvt)
+        self.une_task.api_sig_calib_finished.connect(self.une_tst_task.slot_calib_finished)
+
     # @brief: Start all application tasks.
     def start_tasks(self):
         self.serial_task.start()
@@ -142,6 +152,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.posit_task.start()
         self.une_task.start()
         self.calib_task.start()
+        # !!! For Test
+        self.une_tst_task.start()
 
     def stop_tasks(self):
         self.serial_task.stop()
