@@ -45,7 +45,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         self.serial_task = SerialTask()
         self.udp_task = UdpServerTask(self)
-        self.une_task = UneTask(UneNavMethod.lse)
+        self.une_task = UneTask(UneNavMethod.lsm)
         self.posit_task = PositTask()
         self.calib_task = PositCalibrationTask()
         # !!! For Test
@@ -312,7 +312,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.treeWidget_uneStatus.clear()
         for t in tags:
             tag_item = QTreeWidgetItem(self.treeWidget_uneStatus)
-            tag_item.setText(0, t[0].m_name)
+            tag_item.setText(0, t[0].get_name())
             for an in t[1]:
                 an_item = QTreeWidgetItem(tag_item)
                 an_item.setText(0, an[0])

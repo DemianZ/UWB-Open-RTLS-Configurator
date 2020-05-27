@@ -101,7 +101,7 @@ class PositTask(QThread):
     def check_tag_in_une_list(self, node_id):
         if len(self.tag_une_list):
             for i, tag in enumerate(self.tag_une_list):
-                if tag.m_name == node_id:
+                if tag.get_name() is node_id:
                     return i
         return -1
 
