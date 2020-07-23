@@ -64,7 +64,7 @@ class UdpServerTask(QThread):
             return False
         return True
 
-    @pyqtSlot(tuple, dict)
+    @pyqtSlot(str, list)
     def udp_transmit(self, ip, data):
         callback = self.TxCallback(self.sock.sendto, bytes(data), (ip, UDP_PORT))
         self.thread_pool.start(callback)

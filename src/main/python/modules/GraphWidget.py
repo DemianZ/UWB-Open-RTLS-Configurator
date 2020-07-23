@@ -30,7 +30,7 @@ class GraphWidget(pg.PlotWidget):
                 self.plot_update_anchor(plot[1], [pos[0], pos[1], pos[2]])
                 return
 
-        anchor = self.plot_add_anchor([pos[0], pos[1], pos[2]])
+        anchor = self.plot_add_anchor(data[0], [pos[0], pos[1], pos[2]])
         self.an_plots.append([data[0], anchor, [pos[0], pos[1], pos[2]]])
         return anchor
 
@@ -45,15 +45,23 @@ class GraphWidget(pg.PlotWidget):
         self.tag_plots.append([data[0], tag, [0, 0, 0]])
         return tag
 
-    def plot_add_anchor(self, pos):
+    def plot_add_anchor(self, an_id, pos):
         plot_data_item = pg.ScatterPlotItem(
             [float(pos[0])],
             [float(pos[1])],
             size=10,
-            brush=(QColor('red')))
+            brush=(QColor('red')),
+            name=an_id,
+            data=an_id)
+        anchor_label = pg.TextItem(an_id, color=QColor('yellow'), border=None)
+
+        self.addItem(anchor_label)
+        anchor_label.setPos(float(pos[0]), float(pos[1]))
+
         self.addItem(plot_data_item)
+
         self.invertY(True)
-        self.invertX(True)
+        self.invertX(False)
 
         return plot_data_item
 

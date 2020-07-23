@@ -92,7 +92,8 @@ class SerialTask(QThread):
             self.sig_status_changed.emit('Disconnected from ' + self.com_port.description)
             self.serial.close()
 
-    @pyqtSlot()
+    @pyqtSlot(list)
     def serial_write(self, data):
         if self.serial and self.serial.is_open:
-             self.serial.write(data)
+            self.serial.write(data)
+

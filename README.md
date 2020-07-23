@@ -1,4 +1,4 @@
-## POSIT.PRO Configurator.
+## POSIT.PRO Configurator
 
 ------
 

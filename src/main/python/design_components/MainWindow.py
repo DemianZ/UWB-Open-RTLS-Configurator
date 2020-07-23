@@ -63,8 +63,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.toolButton_connectUne.clicked.connect(self.connect_nodes_req)
         # Serial Task
         self.pushButton_reloadPorts.clicked.connect(self.serial_task.get_ports)
-        self.comboBox_port.currentIndexChanged.connect(
-            lambda: self.serial_task.port_changed(self.comboBox_port.currentIndex()))
+        self.comboBox_port.currentIndexChanged.connect(self.serial_task.port_changed)
         self.pushButton_connect.clicked.connect(self.serial_task.open_port)
         # self.pushButton_connect.clicked.connect(self.serial_task.posit.get_settings)
         self.pushButton_disconnect.clicked.connect(self.serial_task.close_port)
@@ -74,9 +73,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.pushButton_serialDefConfig.clicked.connect(self.serial_task.posit.set_default_settings)
         self.pushButton_serialReboot.clicked.connect(self.serial_task.posit.reboot)
         # Posit Task
-        self.sig_ui_add_anchor_req.connect(lambda data: self.posit_task.add_anchor_req(data))
-        self.sig_ui_add_tag_req.connect(lambda node_id: self.posit_task.add_tag_req(node_id))
-        self.sig_ui_connect_nodes_req.connect(lambda data: self.posit_task.connect_nodes_req(data))
+        self.sig_ui_add_anchor_req.connect(self.posit_task.add_anchor_req)
+        self.sig_ui_add_tag_req.connect(self.posit_task.add_tag_req)
+        self.sig_ui_connect_nodes_req.connect(self.posit_task.connect_nodes_req)
         self.toolButton_startUne.clicked.connect(self.posit_task.start_une)
         # Network Task
         self.pushButton_netReadConfig.clicked.connect(self.net_get_settings_req)
@@ -88,62 +87,52 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             lambda: self.graph.set_room(self.textEdit_roomX.toPlainText(), self.textEdit_roomY.toPlainText()))
         # Calibration
         self.toolButton_startCalibration.clicked.connect(self.start_calibration)
-        self.sig_ui_start_calibration.connect(lambda nodes, dist: self.calib_task.start_calibration(nodes, dist))
+        self.sig_ui_start_calibration.connect(self.calib_task.start_calibration)
 
     # @brief: Connect signals from other tasks to local functions.
     def connect_ext_signals_ui_slots(self):
         # SerialTask + SerialTask.PositSerial
-        self.serial_task.sig_serial_list_ports.connect(lambda ports: self.serial_add_ports(ports))
-        self.serial_task.sig_status_changed.connect(lambda st: self.serial_status_changed(st))
-        self.serial_task.sig_add_console_logs.connect(lambda text, color: self.serial_add_console_logs(text, color))
-        self.serial_task.posit.sig_posit_settings_received.connect(lambda sets: self.serial_update_settings(sets))
+        self.serial_task.sig_serial_list_ports.connect(self.serial_add_ports)
+        self.serial_task.sig_status_changed.connect(self.serial_status_changed)
+        self.serial_task.sig_add_console_logs.connect(self.serial_add_console_logs)
+        self.serial_task.posit.sig_posit_settings_received.connect(self.serial_update_settings)
         # UdpTask.PositNetwork
-        self.udp_task.posit.sig_ui_update_settings.connect(lambda data: self.network_update_settings(data))
-        self.udp_task.posit.sig_ui_update_settings.connect(lambda data: self.network_update_settings(data))
-        self.udp_task.posit.sig_ui_add_device.connect(lambda data: self.network_add_device(data))
-        self.udp_task.posit.sig_ui_remove_device.connect(lambda ip: self.network_remove_device(ip))
-        self.udp_task.posit.sig_ui_update_device.connect(lambda data: self.network_update_device(data))
+        self.udp_task.posit.sig_ui_update_settings.connect(self.network_update_settings)
+        self.udp_task.posit.sig_ui_update_settings.connect(self.network_update_settings)
+        self.udp_task.posit.sig_ui_add_device.connect(self.network_add_device)
+        self.udp_task.posit.sig_ui_remove_device.connect(self.network_remove_device)
+        self.udp_task.posit.sig_ui_update_device.connect(self.network_update_device)
         # PositTask
-        self.posit_task.sig_ui_update_anchor_resp.connect(lambda data: self.add_anchor_resp(data))
-        self.posit_task.sig_ui_update_tag_resp.connect(lambda data: self.add_tag_resp(data))
-        self.posit_task.sig_ui_connect_une_resp.connect(lambda tags: self.connect_nodes_resp(tags))
+        self.posit_task.sig_ui_update_anchor_resp.connect(self.add_anchor_resp)
+        self.posit_task.sig_ui_update_tag_resp.connect(self.add_tag_resp)
+        self.posit_task.sig_ui_connect_une_resp.connect(self.connect_nodes_resp)
         # Calibration task
-        self.calib_task.sig_update_status.connect(lambda status: self.set_status(status))
+        self.calib_task.sig_update_status.connect(self.set_status)
 
     def connect_ext_signals_ext_slots(self):
-        self.serial_task.posit.sig_serial_write.connect(
-            lambda data: self.serial_task.serial_write(data))
-        self.udp_task.posit.sig_udp_transmit.connect(
-            lambda ip, data: self.udp_task.udp_transmit(ip, data))
-        self.posit_task.sig_une_add_new_tag.connect(
-            lambda tag: self.une_task.api_slot_add_tag(tag))
-        self.posit_task.sig_une_upd_tag_meas.connect(
-            lambda meas_list: self.une_task.api_slot_tag_upd_meas(meas_list))
-        self.une_task.api_sig_new_pvt.connect(
-            lambda pvt: self.posit_task.une_new_pvt(pvt))
-        self.udp_task.posit.sig_posit_twr_received.connect(
-            lambda twr_info: self.posit_task.twr_received(twr_info))
-        self.udp_task.posit.sig_posit_twr_received.connect(
-            lambda twr_info: self.posit_task.twr_received(twr_info))
-        self.udp_task.posit.sig_posit_twr_received.connect(
-            lambda twr_info: self.calib_task.twr_received(twr_info))
-        self.serial_task.posit.sig_posit_twr_received.connect(
-            lambda twr_info: self.calib_task.twr_received(twr_info))
-        # Graph Widget
-        self.posit_task.sig_ui_update_anchor_resp.connect(
-            lambda data: self.graph.update_anchor(data))
-        self.posit_task.sig_ui_update_tag_resp.connect(
-            lambda data: self.graph.update_tag(data))
-        self.posit_task.sig_ui_new_pvt.connect(
-            lambda data: self.graph.update_tag(data))
+        # Connect posit serial module with serial task
+        self.serial_task.posit.sig_serial_write.connect(self.serial_task.serial_write)
+        # Connect posit udp module with udp task
+        self.udp_task.posit.sig_udp_transmit.connect(self.udp_task.udp_transmit)
+        # Connect posit task with une task
+        self.posit_task.sig_une_add_new_tag.connect(self.une_task.api_slot_add_tag)
+        self.posit_task.sig_une_upd_tag_meas.connect(self.une_task.api_slot_tag_upd_meas)
+        self.une_task.api_sig_new_pvt.connect(self.posit_task.une_new_pvt)
+        self.udp_task.posit.sig_posit_twr_received.connect(self.posit_task.twr_received)
+        self.udp_task.posit.sig_posit_twr_received.connect(self.calib_task.twr_received)
 
-        # !!! For test. Signal to UNE
-        # self.une_tst_task.sig_add_new_tag.connect(self.une_task.api_slot_add_tag)
-        # self.une_tst_task.sig_upd_tag_meas.connect(self.une_task.api_slot_tag_upd_meas)
-        # self.une_tst_task.sig_calib_start.connect(self.une_task.api_slot_calibrate)
-        # # Signal from UNE
-        # self.une_task.api_sig_new_pvt.connect(self.une_tst_task.slot_new_pvt)
-        # self.une_task.api_sig_calib_finished.connect(self.une_tst_task.slot_calib_finished)
+        self.udp_task.posit.sig_posit_tdoa_sync_received.connect(self.posit_task.tdoa_sync_received)
+        self.udp_task.posit.sig_posit_tdoa_blink_received.connect(self.posit_task.tdoa_blink_received)
+
+        # Connect serial task with calib task
+        self.serial_task.posit.sig_posit_twr_received.connect(self.calib_task.twr_received)
+        # Connect posit task with graph-widget
+        self.posit_task.sig_ui_update_anchor_resp.connect(self.graph.update_anchor)
+        self.posit_task.sig_ui_update_tag_resp.connect(self.graph.update_tag)
+        self.posit_task.sig_ui_new_pvt.connect(self.graph.update_tag)
+        # Connect calib task with une task
+        self.calib_task.sig_start_une_calib.connect(self.une_task.api_slot_calibrate)
+        self.une_task.api_sig_calib_finished.connect(self.calib_task.calib_finished)
 
     # @brief: Start all application tasks.
     def start_tasks(self):
@@ -192,7 +181,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.tableWidget_serialConfig.setItem(row_position, 0, item_name)
             self.tableWidget_serialConfig.setItem(row_position, 1, item_value)
 
-    @pyqtSlot(str, str)
+    @pyqtSlot(str)
     def serial_status_changed(self, st):
         self.label_serialStatus.setText(st)
 
@@ -229,8 +218,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     # @brief:   Remove device from "Network List" table.
     # @args:    list([NodeID, IP, Type, Mode, Rx/Tx, Error])
-    @pyqtSlot(list)
-    def network_remove_device(self, node_data):
+    @pyqtSlot(str)
+    def network_remove_device(self, node_id):
         return
 
     # @brief:   Update device from "Network List" table.
@@ -289,7 +278,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     # @brief:
     #   Slot called on response from PositTask to add_tag_req.
     #   Adds tag ID string to tag list tree-view.
-    @pyqtSlot(str)
+    @pyqtSlot(list)
     def add_tag_resp(self, data):
         node_id = data[0]
         self.listWidget_tag.addItem(node_id)
@@ -331,6 +320,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             key_data = table_view.model().index(row, 0).data()
             value_data = table_view.model().index(row, 1).data()
             data.update({str(key_data): value_data})
+
         for key in PositSerial.ip32_keys:
             if key in data:
                 data[key] = PositSerial.str_to_ip32(str(data[key]))
@@ -349,6 +339,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         ip = self.tableWidget_networkList.item(selected_row_i, 1).text()
 
         sett_dict = self.get_settings_table_data(self.tableWidget_netConfig)
+        if 'TwrConnectedAnchors' in sett_dict:
+            sett_str = sett_dict['TwrConnectedAnchors']
+            sett_list = sett_str[1:-1].split(',')
+            sett_dict['TwrConnectedAnchors'] = [int(sett) for sett in sett_list]
+
         self.udp_task.posit.set_settings_req(ip, sett_dict)
 
     @pyqtSlot()
@@ -372,4 +367,4 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         selected_tags = [item.text() for item in self.listWidget_tag.selectedItems()]
         selected_anchors = [item.text() for item in self.listWidget_anchor.selectedItems()]
         nodes = selected_anchors + selected_tags
-        self.sig_ui_start_calibration.emit(nodes, 1.5)
+        self.sig_ui_start_calibration.emit(nodes, float(self.textEdit_calibDist.toPlainText()))

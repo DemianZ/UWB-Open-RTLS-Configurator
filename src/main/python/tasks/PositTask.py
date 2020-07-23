@@ -10,6 +10,8 @@ from modules.wake import Wake
 import time
 
 
+# DEFAULT_ANT_DELAY = 16436
+# STANDARD DELTA DELAYS: RX = 18418, TX = 14472
 #
 # @brief:
 #   Task for controlling UNE client list and
@@ -40,9 +42,7 @@ import time
 
 class PositTask(QThread):
     sig_une_add_new_tag = pyqtSignal(UneTag, name='UneTask_AddTag')
-    sig_une_upd_tag_meas = pyqtSignal(list, name='')
-
-    sig_udp_transmit = pyqtSignal(tuple, list, name='PositTask_UdpTransmit')
+    sig_une_upd_tag_meas = pyqtSignal(list, name='UneTask_UpdateMeasures')
 
     sig_ui_update_anchor_resp = pyqtSignal(list, name='PositTask_AddAnchorResp')
     sig_ui_update_tag_resp = pyqtSignal(list, name='PositTask_AddTagResp')
@@ -62,6 +62,10 @@ class PositTask(QThread):
         self.epoch_pvt = dict()
         self.epoch_cnt = 0
 
+        self.tdoa_pvt = dict()
+        self.tdoa_pvt_max_len = 10000
+
+
     # Task loop
     def run(self):
         self.restore_default_une_config()
@@ -75,7 +79,7 @@ class PositTask(QThread):
         self.quit()
 
     def restore_default_une_config(self):
-        with open(os.path.join(os.path.dirname(__file__), '../modules/istra_config.json'), 'r') as f:
+        with open(os.path.join(os.path.dirname(__file__), '../une_configs/home_room.json'), 'r') as f:
             def_config = json.load(f)
             for anchor, pos, in def_config['anchors'].items():
                 self.add_anchor_req([anchor, [str(pos) for pos in pos]])
@@ -210,3 +214,31 @@ class PositTask(QThread):
 
             # log.debug("TWR_EPOCH " + str(self.epoch_cnt) + "\n" + str(self.epoch_pvt))
         return
+
+    @pyqtSlot(object)  # from UDPServerTask.positNetwork to UneTask
+    def tdoa_sync_received(self, tdoa_info):
+        log_str = "TDOA_SYNC: NodeID={}, SyncID={}, NN={}, TX_TS={}, RX_TS={} ".format(
+            tdoa_info.NodeID,
+            tdoa_info.SyncID,
+            tdoa_info.SyncNN,
+            tdoa_info.SyncTxTS,
+            tdoa_info.SyncRxTS)
+        self.tdoa_wr_log(log_str)
+
+    @pyqtSlot(object)  # from UDPServerTask.positNetwork to UneTask
+    def tdoa_blink_received(self, tdoa_info):
+        log_str = "TDOA_BLINK: NodeID={}, BlinkID={}, NN={}, TS={}".format(
+            tdoa_info.NodeID,
+            tdoa_info.BlinkID,
+            tdoa_info.BlinkNN,
+            tdoa_info.BlinkTS)
+        self.tdoa_wr_log(log_str)
+
+    def tdoa_wr_log(self, log_str):
+        if len(self.tdoa_pvt) < self.tdoa_pvt_max_len:
+            self.tdoa_pvt[str(len(self.tdoa_pvt))] = log_str
+        elif len(self.tdoa_pvt) == self.tdoa_pvt_max_len:
+            self.tdoa_pvt[str(len(self.tdoa_pvt))] = log_str
+            with open('./logs/tdoa_data.json', 'w') as outfile:
+                json.dump(self.tdoa_pvt, outfile)
+                log.debug('TDOA DATA COLLECTED')

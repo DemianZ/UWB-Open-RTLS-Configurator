@@ -41,6 +41,8 @@ class PositNetwork(QObject):
     sig_posit_settings_received = pyqtSignal(str, dict, name='PositNetwork_PositSettingsReceived')
     sig_posit_hello_received = pyqtSignal(str, name='PositNetwork_PositHelloReceived')
     sig_posit_twr_received = pyqtSignal(object, name='PositNetwork_PositTwrReceived')
+    sig_posit_tdoa_sync_received = pyqtSignal(object, name='PositNetwork_PositTdoaSyncReceived')
+    sig_posit_tdoa_blink_received = pyqtSignal(object, name='PositNetwork_PositTdoaBlinkReceived')
 
     sig_udp_transmit = pyqtSignal(str, list, name='PositNetwork_UdpTransmit')
 
@@ -83,12 +85,20 @@ class PositNetwork(QObject):
             callback = self.RxCallback(self.get_settings_callback, ip, data)
             self.thread_pool.start(callback)
 
-        if cmd == Wake.CMD_SET_SETTINGS_RESP:
+        elif cmd == Wake.CMD_SET_SETTINGS_RESP:
             callback = self.RxCallback(self.set_settings_callback, ip, data)
             self.thread_pool.start(callback)
 
         elif cmd == Wake.CMD_TWR_RANGING:
             callback = self.RxCallback(self.twr_ranging_callback, ip, data)
+            self.thread_pool.start(callback)
+
+        elif cmd == Wake.CMD_TDOA_SYNC:
+            callback = self.RxCallback(self.tdoa_sync_callback, ip, data)
+            self.thread_pool.start(callback)
+
+        elif cmd == Wake.CMD_TDOA_BLINK:
+            callback = self.RxCallback(self.tdoa_blink_callback, ip, data)
             self.thread_pool.start(callback)
 
         elif cmd == Wake.CMD_REBOOT_RESP:
@@ -147,6 +157,12 @@ class PositNetwork(QObject):
             self.monitoring.ParseFromString(bytes(data))
         except Exception as e:
             return e
+
+        if self.check_ip_in_network_list(ip) < 0:
+            self.net_device_list.append([None, ip, None, None, None, None])  # empty settings
+            self.sig_ui_add_device.emit(self.net_device_list[len(self.net_device_list) - 1])
+            log.debug("NEW DEVICE: {}".format(ip))
+
         twr_info = self.monitoring.TWR
         self.sig_posit_twr_received.emit(twr_info)
         log.debug("TWR: NodeID={}, InitID={}, D={}, PollNN={}, RespNN={}, FinalNN={}".format(
@@ -156,6 +172,51 @@ class PositNetwork(QObject):
             twr_info.PollNN,
             twr_info.ResponseNN,
             twr_info.FinalNN))
+        return True
+
+    def tdoa_sync_callback(self, ip, data):
+        try:
+            self.monitoring.ParseFromString(bytes(data))
+        except Exception as e:
+            return e
+
+        if self.check_ip_in_network_list(ip) < 0:
+            self.net_device_list.append([None, ip, None, None, None, None])  # empty settings
+            self.sig_ui_add_device.emit(self.net_device_list[len(self.net_device_list) - 1])
+            log.debug("NEW DEVICE: {}".format(ip))
+
+        tdoa_info = self.monitoring.TDOA
+        self.sig_posit_tdoa_sync_received.emit(tdoa_info)
+        log_str = "TDOA_SYNC: NodeID={}, SyncID={}, NN={}, TX_TS={}, RX_TS={} ".format(
+            tdoa_info.NodeID,
+            tdoa_info.SyncID,
+            tdoa_info.SyncNN,
+            tdoa_info.SyncTxTS,
+            tdoa_info.SyncRxTS)
+
+        log.debug(log_str)
+        return True
+
+    def tdoa_blink_callback(self, ip, data):
+        try:
+            self.monitoring.ParseFromString(bytes(data))
+        except Exception as e:
+            return e
+
+        if self.check_ip_in_network_list(ip) < 0:
+            self.net_device_list.append([None, ip, None, None, None, None])  # empty settings
+            self.sig_ui_add_device.emit(self.net_device_list[len(self.net_device_list) - 1])
+            log.debug("NEW DEVICE: {}".format(ip))
+
+        tdoa_info = self.monitoring.TDOA
+        self.sig_posit_tdoa_blink_received.emit(tdoa_info)
+        log_str = "TDOA_BLINK: NodeID={}, BlinkID={}, NN={}, TS={}".format(
+            tdoa_info.NodeID,
+            tdoa_info.BlinkID,
+            tdoa_info.BlinkNN,
+            tdoa_info.BlinkTS)
+
+        log.debug(log_str)
         return True
 
     def set_settings_callback(self, ip, data):
@@ -171,11 +232,6 @@ class PositNetwork(QObject):
         self.sig_udp_transmit.emit(ip, buf)
 
     def set_settings_req(self, ip, settings_dict):
-        if 'ConnectedAnchors' in settings_dict:
-            sett_str = settings_dict['ConnectedAnchors']
-            sett_list = sett_str[1:-1].split(',')
-            settings_dict['ConnectedAnchors'] = [int(sett) for sett in sett_list]
-
         settings_pb = Settings_pb2.Settings()
         ParseDict(settings_dict, settings_pb)
         settings_string = settings_pb.SerializeToString()

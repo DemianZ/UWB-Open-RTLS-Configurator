@@ -32,6 +32,8 @@ class Wake:
     CMD_SET_DEF_SETTINGS_REQ = 0x15
     CMD_SET_DEF_SETTINGS_RESP = 0x16
     CMD_TWR_RANGING = 0x21
+    CMD_TDOA_SYNC = 0x41
+    CMD_TDOA_BLINK = 0x42
 
     def __init__(self):
         self.len = 0
