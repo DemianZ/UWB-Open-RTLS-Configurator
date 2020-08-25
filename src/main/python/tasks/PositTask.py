@@ -3,6 +3,7 @@ import atexit
 import logging as log
 import json
 import os
+import sys
 from tasks.UneTask import UneTag, UneErrors, UneMeas
 from proto import Settings_pb2
 from google.protobuf.json_format import Parse, ParseDict
@@ -242,3 +243,4 @@ class PositTask(QThread):
             with open('./logs/tdoa_data.json', 'w') as outfile:
                 json.dump(self.tdoa_pvt, outfile)
                 log.debug('TDOA DATA COLLECTED')
+                sys.exit(0)

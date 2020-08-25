@@ -46,7 +46,8 @@ class RTTrPM():
 			for LED in self.LEDAccVelMod:
 				LED.printModule()
 
-class Packet():
+
+class Packet:
 	
 	# Generic packet information, each module contains this data, which
 	# is used to help determine how to proceed with data extraction
@@ -55,6 +56,7 @@ class Packet():
 		self.intSig = intSig
 		self.fltSig = fltSig
 		self.data = data[1:]
+
 
 class Trackable(Packet):
 	
