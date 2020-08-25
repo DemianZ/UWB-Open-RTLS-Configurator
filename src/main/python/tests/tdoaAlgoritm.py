@@ -8,6 +8,7 @@ import numpy as np
 SPEED_OF_LIGHT = 299792458
 DWT_TIME_UNITS = float(1.0/499.2e6/128.0)
 
+
 class Anchor:
 	def __init__(self, id, type, x, y, z):
 		self.id = id
@@ -62,7 +63,8 @@ for nn, record in log_data.items():
 			"tx_id": par_list[2].split("=")[1],
 			"NN": int(par_list[3].split("=")[1]),
 			"TX_TS": int(par_list[4].split("=")[1]),
-			"RX_TS": int(par_list[5].split("=")[1])
+			"RX_TS": int(par_list[5].split("=")[1]),
+			"K": 0
 		}
 	else:
 		log_data[nn] = {
@@ -95,18 +97,33 @@ def flush_blink_epoch():
 	blink_epoch = dict()
 
 
+prev_record = dict()
+
 def collect_sync_data():
-	global sync_cnt, collecting_sync, sync_collected
+	global sync_cnt, collecting_sync, sync_collected, k_koeff, prev_record, sync_epoch
 
 	sync_id = record["tx_id"]
 	anchor_id = record["id"]
 
 	if anchor_id not in sync_epoch[sync_id]:
 		sync_epoch[sync_id][anchor_id] = dict()
+	if anchor_id not in prev_record:
+		prev_record[anchor_id] = dict()
+
+	k_koeff = 0
+
+	if len(prev_record[anchor_id]):
+		drx = record["RX_TS"] - prev_record[anchor_id]["RX_TS"]
+		dtx = record["TX_TS"] - prev_record[anchor_id]["TX_TS"]
+		k_koeff = drx/dtx
+		prev_record[anchor_id] = record
+	else:
+		prev_record[anchor_id] = record
 
 	sync_epoch[sync_id][anchor_id]["TX_TS"] = record["TX_TS"]
 	sync_epoch[sync_id][anchor_id]["RX_TS"] = record["RX_TS"]
 	sync_epoch[sync_id][anchor_id]["NN"] = record["NN"]
+	sync_epoch[sync_id][anchor_id]["K"] = k_koeff
 
 	if len(sync_epoch[sync_id]) == n_anchors:
 		collecting_sync = False
@@ -137,17 +154,30 @@ def compute_tdoa(sync_epoch: dict, blink_epoch: dict):
 					r_shift = compute_shift_dwm(anchors_pos[bl_an], anchors_sync[sync_id])
 					tof_shift = r_shift / SPEED_OF_LIGHT		# shift in seconds
 					dwm_shift = tof_shift / DWT_TIME_UNITS
-					delta_dwm = sync_ep[bl_an]["RX_TS"] - (bl_ep["TS"]) - dwm_shift
-					delta_t = delta_dwm * DWT_TIME_UNITS
-					deltas_seconds[blink_id][bl_an] = {"dt": delta_t, "NN": bl_ep["NN"]}
-	return deltas_seconds
+					if sync_ep[bl_an]["K"] != 0:
+						delta_dwm = sync_ep[bl_an]["RX_TS"] - ((bl_ep["TS"]) + dwm_shift * sync_ep[bl_an]["K"])
+						if delta_dwm > 0:
+							print(delta_dwm, bl_an, bl_ep["NN"])
+							delta_dwm = -0xFFFFFFFFFE + delta_dwm
+
+						delta_t = delta_dwm * DWT_TIME_UNITS
+						deltas_seconds[blink_id][bl_an] = {"dt": delta_t, "NN": bl_ep["NN"]}
+					# else:
+					# 	print(bl_ep["NN"])
+	if len(deltas_seconds[blink_id]):
+		return deltas_seconds
+
 
 deltas_second = []
+
 
 for nn, record in log_data.items():
 	# Collect SYNC
 	if collecting_sync is True:
 		if record['type'] != "TDOA_SYNC":		# if not enough sync collected
+			print('Skip epoch: ', record['NN'])
+			flush_sync_epoch()
+			prev_record = dict()
 			continue
 
 		if sync_collected is True:		# if already all syncs collected, start again
@@ -192,7 +222,11 @@ for nn, record in log_data.items():
 			continue
 		try:
 			if len(blink_epoch[blink_id]) == n_anchors:
-				deltas_second.append(compute_tdoa(sync_epoch, blink_epoch))
+				d_sec = compute_tdoa(sync_epoch, blink_epoch)
+				if d_sec is not None:
+					deltas_second.append(d_sec)
+				else:
+					print("Skip, no sync epoch: ", blink_epoch[blink_id][an_id]["NN"])
 				flush_blink_epoch()
 		except Exception as e:
 			print(str(e) + str(record["NN"]))
@@ -200,24 +234,36 @@ for nn, record in log_data.items():
 d1d2 = list()
 d1d3 = list()
 d1d4 = list()
-nn = list()
+nn_12 = list()
+nn_13 = list()
+nn_14 = list()
 
 for delta in deltas_second:
-	nn.append(int(delta["21"]["11"]["NN"]))
-	d1d2.append(float(delta["21"]["11"]["dt"] - delta["21"]["12"]["dt"]) * 10e6)
-	d1d3.append(float(delta["21"]["11"]["dt"] - delta["21"]["13"]["dt"])*10e6)
-	d1d4.append(float(delta["21"]["11"]["dt"] - delta["21"]["14"]["dt"])*10e6)
+	nn_12.append(int(delta["21"]["11"]["NN"]))
+	nn_13.append(int(delta["21"]["11"]["NN"]))
+	nn_14.append(int(delta["21"]["11"]["NN"]))
+
+	if float(delta["21"]["11"]["dt"] - delta["21"]["12"]["dt"]) * SPEED_OF_LIGHT < -100:
+		print(float(delta["21"]["11"]["dt"] - delta["21"]["12"]["dt"]) * SPEED_OF_LIGHT)
+	if float(delta["21"]["11"]["dt"] - delta["21"]["12"]["dt"]) * SPEED_OF_LIGHT > 100:
+		print(float(delta["21"]["11"]["dt"] - delta["21"]["12"]["dt"]) * SPEED_OF_LIGHT)
+	d1d2.append(float(delta["21"]["11"]["dt"] - delta["21"]["12"]["dt"]) * SPEED_OF_LIGHT)
+	d1d3.append(float(delta["21"]["11"]["dt"] - delta["21"]["13"]["dt"]) * SPEED_OF_LIGHT)
+	d1d4.append(float(delta["21"]["11"]["dt"] - delta["21"]["14"]["dt"]) * SPEED_OF_LIGHT)
 
 
-plt.subplot(131)
+plt.figure(1)
+ax1 = plt.subplot(311)
+ax1.set_ylim(-150, 150)
+plt.plot(nn_12, d1d2)
 
-ax1 = plt.subplot(1, 3, 1)
-ax1.plot(nn, d1d2)
+ax2 = plt.subplot(312)
+ax2.set_ylim(-150, 150)
+plt.plot(nn_13, d1d3)
 
-ax2 = plt.subplot(1, 3, 2)
-ax2.plot(nn, d1d3)
-# ax3.set_ylim(-2, 2)
-ax3 = plt.subplot(1, 3, 3)
-ax3.plot(nn, d1d4)
+ax3 = plt.subplot(313)
+ax3.set_ylim(-150, 150)
+plt.plot(nn_14, d1d4)
 
+plt.show()
 pass
