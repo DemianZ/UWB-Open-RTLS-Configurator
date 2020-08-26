@@ -158,15 +158,18 @@ def compute_tdoa(sync_epoch: dict, blink_epoch: dict):
 		for bl_an, bl_ep in blink_ep.items():
 			for sync_id, sync_ep in sync_epoch.items():		# can be only one sync node
 				if bl_an not in deltas_seconds[blink_id]:
-					r_shift = compute_shift_dwm(anchors_pos[bl_an], anchors_sync[sync_id])
-					tof_shift = r_shift / SPEED_OF_LIGHT		# shift in seconds
-					dwm_shift = tof_shift / DWT_TIME_UNITS
 					if sync_ep[bl_an]["K"] != 0:
-						# delta_dwm = sync_ep[bl_an]["RX_TS"] - ((bl_ep["TS"]) + dwm_shift * sync_ep[bl_an]["K"])
-						delta_dwm = bl_ep["TS"] - (sync_ep[bl_an]["RX_TS"] + dwm_shift)
-						if delta_dwm < 0:
-							delta_dwm = bl_ep["TS"] + (0xFFFFFFFFFE - (sync_ep[bl_an]["RX_TS"] + dwm_shift))
+						r_shift = compute_shift_dwm(anchors_pos[bl_an], anchors_sync[sync_id])
+						tof_shift = r_shift / SPEED_OF_LIGHT  # shift in seconds
+						dwm_shift = tof_shift / DWT_TIME_UNITS
 
+						dwm_shift_total = (sync_ep[bl_an]["RX_TS"] - dwm_shift) - sync_ep[bl_an]["TX_TS"]
+
+						dbs = bl_ep["TS"] - (sync_ep[bl_an]["RX_TS"])
+						if dbs < 0:
+							dbs = bl_ep["TS"] + (0xFFFFFFFFFE - (sync_ep[bl_an]["RX_TS"]))
+
+						delta_dwm = bl_ep["TS"] - dwm_shift_total + dbs * (1 - sync_ep[bl_an]["K"])
 						delta_t = delta_dwm * DWT_TIME_UNITS
 						deltas_seconds[blink_id][bl_an] = {"dt": delta_t, "NN": bl_ep["NN"]}
 					# else:
@@ -260,9 +263,9 @@ nn = list()
 for delta in deltas_second:
 	nn.append(int(delta["21"]["11"]["NN"]))
 
-	d1d2.append(float(delta["21"]["11"]["dt"] - delta["21"]["12"]["dt"]) * SPEED_OF_LIGHT)
-	d1d3.append(float(delta["21"]["11"]["dt"] - delta["21"]["13"]["dt"]) * SPEED_OF_LIGHT)
-	d1d4.append(float(delta["21"]["11"]["dt"] - delta["21"]["14"]["dt"]) * SPEED_OF_LIGHT)
+	d1d2.append(float(delta["21"]["11"]["dt"] - delta["21"]["14"]["dt"]) * SPEED_OF_LIGHT)
+	d1d3.append(float(delta["21"]["12"]["dt"] - delta["21"]["14"]["dt"]) * SPEED_OF_LIGHT)
+	d1d4.append(float(delta["21"]["13"]["dt"] - delta["21"]["14"]["dt"]) * SPEED_OF_LIGHT)
 
 	d1.append(float(delta["21"]["11"]["dt"]))
 	d2.append(float(delta["21"]["12"]["dt"]))
@@ -285,12 +288,12 @@ plt.plot(nn, d4)
 
 plt.figure(2)
 ax5 = plt.subplot(311)
-plt.plot(nn, d1d2)
+plt.plot(nn[:100], d1d2[:100])
 
 ax6 = plt.subplot(312)
-plt.plot(nn, d1d3)
+plt.plot(nn[:100], d1d3[:100])
 
 ax7 = plt.subplot(313)
-plt.plot(nn, d1d4)
+plt.plot(nn[:100], d1d4[:100])
 
 plt.show()
