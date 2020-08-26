@@ -99,6 +99,7 @@ def flush_blink_epoch():
 
 prev_record = dict()
 
+
 def collect_sync_data():
 	global sync_cnt, collecting_sync, sync_collected, k_koeff, prev_record, sync_epoch
 
@@ -113,6 +114,12 @@ def collect_sync_data():
 	k_koeff = 0
 
 	if len(prev_record[anchor_id]):
+		if int(record["NN"]) - (prev_record[anchor_id]["NN"]) != 1:
+			flush_sync_epoch()
+			collecting_sync = True
+			sync_collected = False
+			return
+
 		drx = record["RX_TS"] - prev_record[anchor_id]["RX_TS"]
 		dtx = record["TX_TS"] - prev_record[anchor_id]["TX_TS"]
 		k_koeff = drx/dtx
@@ -155,10 +162,10 @@ def compute_tdoa(sync_epoch: dict, blink_epoch: dict):
 					tof_shift = r_shift / SPEED_OF_LIGHT		# shift in seconds
 					dwm_shift = tof_shift / DWT_TIME_UNITS
 					if sync_ep[bl_an]["K"] != 0:
-						delta_dwm = sync_ep[bl_an]["RX_TS"] - ((bl_ep["TS"]) + dwm_shift * sync_ep[bl_an]["K"])
-						if delta_dwm > 0:
-							print(delta_dwm, bl_an, bl_ep["NN"])
-							delta_dwm = -0xFFFFFFFFFE + delta_dwm
+						# delta_dwm = sync_ep[bl_an]["RX_TS"] - ((bl_ep["TS"]) + dwm_shift * sync_ep[bl_an]["K"])
+						delta_dwm = bl_ep["TS"] - (sync_ep[bl_an]["RX_TS"] + dwm_shift)
+						if delta_dwm < 0:
+							delta_dwm = bl_ep["TS"] + (0xFFFFFFFFFE - (sync_ep[bl_an]["RX_TS"] + dwm_shift))
 
 						delta_t = delta_dwm * DWT_TIME_UNITS
 						deltas_seconds[blink_id][bl_an] = {"dt": delta_t, "NN": bl_ep["NN"]}
@@ -175,7 +182,7 @@ for nn, record in log_data.items():
 	# Collect SYNC
 	if collecting_sync is True:
 		if record['type'] != "TDOA_SYNC":		# if not enough sync collected
-			print('Skip epoch: ', record['NN'])
+			print('Skip epoch, waiting sync: ', record['NN'])
 			flush_sync_epoch()
 			prev_record = dict()
 			continue
@@ -205,6 +212,12 @@ for nn, record in log_data.items():
 		if blink_id not in blink_epoch:
 			blink_epoch[blink_id] = dict()
 
+		for epoch in blink_epoch[blink_id].values():
+			if record["NN"] != epoch["NN"]:
+				flush_blink_epoch()
+				blink_epoch[blink_id] = dict()
+				break
+
 		if an_id not in blink_epoch[blink_id]:
 			blink_epoch[blink_id][an_id] = {
 				"TS": record["TS"],
@@ -218,6 +231,7 @@ for nn, record in log_data.items():
 				collecting_sync = True
 				sync_collected = False
 				break
+
 		if collecting_sync is True:
 			continue
 		try:
@@ -231,39 +245,52 @@ for nn, record in log_data.items():
 		except Exception as e:
 			print(str(e) + str(record["NN"]))
 
+
+d1 = list()
+d2 = list()
+d3 = list()
+d4 = list()
+
 d1d2 = list()
 d1d3 = list()
 d1d4 = list()
-nn_12 = list()
-nn_13 = list()
-nn_14 = list()
+
+nn = list()
 
 for delta in deltas_second:
-	nn_12.append(int(delta["21"]["11"]["NN"]))
-	nn_13.append(int(delta["21"]["11"]["NN"]))
-	nn_14.append(int(delta["21"]["11"]["NN"]))
+	nn.append(int(delta["21"]["11"]["NN"]))
 
-	if float(delta["21"]["11"]["dt"] - delta["21"]["12"]["dt"]) * SPEED_OF_LIGHT < -100:
-		print(float(delta["21"]["11"]["dt"] - delta["21"]["12"]["dt"]) * SPEED_OF_LIGHT)
-	if float(delta["21"]["11"]["dt"] - delta["21"]["12"]["dt"]) * SPEED_OF_LIGHT > 100:
-		print(float(delta["21"]["11"]["dt"] - delta["21"]["12"]["dt"]) * SPEED_OF_LIGHT)
 	d1d2.append(float(delta["21"]["11"]["dt"] - delta["21"]["12"]["dt"]) * SPEED_OF_LIGHT)
 	d1d3.append(float(delta["21"]["11"]["dt"] - delta["21"]["13"]["dt"]) * SPEED_OF_LIGHT)
 	d1d4.append(float(delta["21"]["11"]["dt"] - delta["21"]["14"]["dt"]) * SPEED_OF_LIGHT)
 
+	d1.append(float(delta["21"]["11"]["dt"]))
+	d2.append(float(delta["21"]["12"]["dt"]))
+	d3.append(float(delta["21"]["13"]["dt"]))
+	d4.append(float(delta["21"]["14"]["dt"]))
 
 plt.figure(1)
-ax1 = plt.subplot(311)
-ax1.set_ylim(-150, 150)
-plt.plot(nn_12, d1d2)
+ax1 = plt.subplot(411)
+plt.plot(nn, d1)
 
-ax2 = plt.subplot(312)
-ax2.set_ylim(-150, 150)
-plt.plot(nn_13, d1d3)
+ax2 = plt.subplot(412)
+plt.plot(nn, d2)
 
-ax3 = plt.subplot(313)
-ax3.set_ylim(-150, 150)
-plt.plot(nn_14, d1d4)
+ax3 = plt.subplot(413)
+plt.plot(nn, d3)
+
+ax4 = plt.subplot(414)
+plt.plot(nn, d4)
+
+
+plt.figure(2)
+ax5 = plt.subplot(311)
+plt.plot(nn, d1d2)
+
+ax6 = plt.subplot(312)
+plt.plot(nn, d1d3)
+
+ax7 = plt.subplot(313)
+plt.plot(nn, d1d4)
 
 plt.show()
-pass
