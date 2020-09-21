@@ -77,7 +77,7 @@ class UneConst:
 
     _epoch_period = 2
     _meas_min = 3
-    _lse_max_iter = 9
+    _lsm_max_iter = 9
     _pvt_length = 3
     _X = 0
     _Y = 1
@@ -89,7 +89,7 @@ class UneConst:
     _ZV = 6
     _NV = 7
     _calib_meas_min_len = 200
-    _max_pdop = 6
+    _max_pdop = 10
 
     @property
     def epoch_period(self):
@@ -104,7 +104,7 @@ class UneConst:
     @property
     def lse_max_iter(self):
         """ Maximum number of iteration for LSE method """
-        return self._lse_max_iter
+        return self._lsm_max_iter
 
     @property
     def pvt_length(self):
@@ -435,6 +435,10 @@ class UneTag:
 class Une:
     """ Class that contains methods, properties and other fields
         to describe states of tag and to control it
+
+        Note
+        -----
+        Default method to solve navigation equations is UneNavMethod.kalman
     """
     # Properties
     _nav_method = UneNavMethod.lsm
@@ -443,8 +447,7 @@ class Une:
     _num_of_pt_prm = 3     # 3 parameters now: [x, y, z]
     _num_of_v_prm = 3      # 3 parameters: [xv, yv, zv]
     _pos_err = 0.005       # Error threshold between the previous and current computation steps to stop computation [m]
-
-    _const = UneConst()
+    _const = UneConst()    # Object with constant values
 
     # For antenna delay estimation
     _calib_info = dict()
@@ -462,8 +465,24 @@ class Une:
 
     # List of tags
     _tags = list()
+    
+    # For Kalman filter method
+    # Define variables for init state
+    _INIT_P = 10.0
+    _INIT_R = 0.1**2
+    _INIT_Q = 1.0e-3
 
-    def __init__(self, nav_method):
+    # Define size of matrices and vectors
+    _n_state = 3
+
+    # Main matrices
+    _X = np.zeros(_n_state)
+    _F = np.diag(np.ones(_n_state))
+    _I = np.diag(np.ones(_n_state))
+    _P = np.diag(np.ones(_n_state) * _INIT_P)
+    _Q = np.diag(np.ones(_n_state) * _INIT_Q)
+
+    def __init__(self, nav_method=UneNavMethod.kalman):
         """ The constructor.
             To choose nav_method you should use
             the UneNavMethod enumerator.
@@ -517,7 +536,7 @@ class Une:
                     self.get_position_lsm(tag)
                 elif self._nav_method == UneNavMethod.weighted_lsm:
                     self.get_position_wlsm(tag)
-                elif self._nav_method == UneNavMethod.Kalman:
+                elif self._nav_method == UneNavMethod.kalman:
                     self.get_position_kalman(tag)
 
                 # toc_t = tag.toc()
@@ -599,12 +618,12 @@ class Une:
                 mtx_y[cnt_meas] = d_err
                 cnt_meas += 1
 
-            # Using the LSE method for estimating user state vector: mtx_x = [dx, dy, dz]
+            # Using the least squares method for estimating user state vector: mtx_x = [dx, dy, dz]
             mtx_g_trp = mtx_g.transpose()
             try:
                 mtx_q = np.linalg.inv(np.matmul(mtx_g_trp, mtx_g))
             except np.linalg.LinAlgError as e:
-                log.debug("-E-: [Une::get_position_lse] LinAlgError for tag {}: {}".format(tag.get_name(), e))
+                log.debug("-E-: [Une::get_position_lsm] LinAlgError for tag {}: {}".format(tag.get_name(), e))
                 tag.set_pvt(tag_pvt_save)
                 tag.set_err_code(UneErrors.linalg_error)
                 # Setting this flag to emit signal from UneTask
@@ -666,7 +685,7 @@ class Une:
         if flg_stop_computation is True:
             tag.set_err_code(UneErrors.none)
         else:
-            log.debug("-E-: [Une::get_position_lse] Too many iteration for tag {}".format(tag.get_name()))
+            log.debug("-E-: [Une::get_position_lsm] Too many iteration for tag {}".format(tag.get_name()))
             tag.set_pvt(tag_pvt_save)
             tag.set_err_code(UneErrors.too_many_iteration)
 
@@ -675,10 +694,122 @@ class Une:
         pos = [0, 0, 0]
         return UneErrors.none
 
-    def get_position_kalman(self, pos):
-        """ Comment... """
-        pos = [0, 0, 0]
-        return UneErrors.none
+    def get_position_kalman(self, tag):
+        """ Method to estimate tag position using Kalman filter method
+        """
+        num_anchors = len(tag.get_anchors())
+        num_max_iteration = self._const.lse_max_iter
+
+        if num_anchors < self._const.meas_min:
+            tag.set_pvt(0, 0, 0)
+            # Setting this flag to emit signal from UneTask
+            tag.set_int_flags(UneFlags.new_pvt_is_ready)
+            tag.set_err_code(UneErrors.not_enough_meas)
+            return
+
+        # Get measurements for current & previous epoch
+        meas_prev = tag.get_meas_prev()
+        meas_curr = tag.get_meas_curr()
+
+        # Geometry matrix
+        _H = np.zeros((num_anchors, self._n_state))
+
+        # Measurement vector for position
+        _Y = np.zeros(num_anchors)
+
+        # Measurement errors matrix
+        _R = np.diag(np.ones(num_anchors) * self._INIT_R)
+
+        # Residual vector
+        _RV = np.zeros(num_anchors)
+
+        # Matrices to compute DOPs and auxiliary matrix
+        _D = np.zeros((self._n_state, self._n_state))
+
+        # Save current tag position (to restore current if any errors)
+        tag_pvt_save = tag.get_pvt()
+
+        # Get tag position obtained at the previous step
+        tag_pvt_prev = tag.get_pvt()
+
+        cnt_meas = 0
+        for a_name, a_meas in meas_curr:
+            # Get distance between anchor and tag position on previous computation step
+            [x, y, z, d_prev] = tag.get_pos_and_dist(a_name, tag_pvt_prev)
+
+            # Get difference between previous and current distances to compute error in current user position
+            d_err = a_meas[0] - d_prev
+
+            # Filling geometry and measurements matrices for
+            # computing errors of user position, velocity and time [dx, dy, dz, dt] [dvx, dvy, dvz]
+            _H[cnt_meas] = [x / d_prev, y / d_prev, z / d_prev]
+            _Y[cnt_meas] = d_err
+            cnt_meas += 1
+
+        # Get DOPs
+        try:
+            _D = np.linalg.inv(np.matmul(_H.transpose(), _H))
+        except np.linalg.LinAlgError as e:
+            tag.set_pvt(tag_pvt_save)
+            tag.set_err_code(UneErrors.linalg_error)
+            # Setting this flag to emit signal from UneTask
+            tag.set_int_flags(UneFlags.new_pvt_is_ready)
+            return
+        
+        p_dop = _D.trace()
+        h_dop = math.sqrt(_D[0][0] ** 2 + _D[1][1] ** 2)
+        v_dop = math.sqrt(_D[2][2] ** 2)
+
+        # Check DOPs
+        if p_dop > self._const.max_pdop and tag.get_dist(tag_pvt_save[:3]) > 0.1:
+            # Set previous PVT
+            tag.set_pvt(tag_pvt_save)
+            # Set error code
+            tag.set_err_code(UneErrors.big_dop)
+            # Set this flag to emit signal from UneTask
+            tag.set_int_flags(UneFlags.new_pvt_is_ready)
+            return
+
+        # Step1. Predicting
+        self._X = np.matmul(self._F, self._X)
+        self._P = np.matmul(np.matmul(self._F, self._P), self._F.transpose()) + self._Q
+
+        # Step2. Computing the Kalman gain
+        try:
+            _S = np.linalg.inv(np.matmul(np.matmul(_H, self._P), _H.transpose()) + _R)
+        except np.linalg.LinAlgError as e:
+            log.debug("-E-: [Une::get_position_kalman] LinAlgError for tag {}: {}".format(tag.get_name(), e))
+            tag.set_pvt(tag_pvt_save)
+            tag.set_err_code(UneErrors.linalg_error)
+            # Setting this flag to emit signal from UneTask
+            tag.set_int_flags(UneFlags.new_pvt_is_ready)
+            return
+
+        _K = np.matmul(np.matmul(self._P, _H.transpose()), _S)
+
+        # Step3. Updating the state vector and the process covariance matrix
+        self._X = self._X + np.matmul(_K, _Y - np.matmul(_H, self._X))
+        self._P = np.matmul((self._I - np.matmul(_K, _H)), self._P)
+
+        # Correct current position by errors from state vector mtx_x
+        tag.upd_pos(self._X[self._const.x], self._X[self._const.y], self._X[self._const.z], 0)
+
+        # Reset position in state vector
+        self._X[:] = 0
+
+        # Update previous epoch timestamp
+        tag.upd_epoch_time()
+
+        # Get residuals vector
+        _YR = np.matmul(_H, self._X)
+        _RV = np.subtract(_Y, _YR)
+        tag.set_residuals(_RV)
+
+        # Set DOPs
+        tag.set_dops(h_dop, v_dop, p_dop)
+
+        # Setting this flag to emit signal from UneTask
+        tag.set_int_flags(UneFlags.new_pvt_is_ready)
 
     def calibration_init(self, info, meas):
         """ Method to check data for calibrating, updating local dictionaries with info/meas
