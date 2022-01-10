@@ -1,32 +1,30 @@
-## POSIT.PRO Configurator
+## UWB Open-RTLS Configurator
 
-------
+This is a cross-platform PyQT tool for configuration and monitoring nodes of UWB Open-RTLS system.
 
-#### Python3:
+Firmware for STM32-based RTLS nodes is [here](https://github.com/DemianZ/UWB-Open-RTLS-MCU).
 
-- Switch to virtual environment: `source fbsenv/bin/activate`
+Configuration tool is used setting up and monitor RTLS nodes, connected to your local network. You can set network and RTLS parameters for each node. Tool has a simple monitor window (based on pyqtgraph) with constant anchor positions and live-updating tag positions. You can configure Universal Navigation Engine (UNE) by adding new tags and anchors.
 
-- Switch back: `decativate`
+<img src="/Users/a19256821/Documents/Home/uwb/UWB-Open-RTLS-Configurator/docs/config_utility_screen.png" alt="config_utility_screen"  />
 
-- Run project: `fbs run`
+##### Simple example, 4 anchor, 1 tag, TWR mode, update rate - 10 Hz:
 
-- Generate .py proto files from proto file using Protoc
+![train_gif](/Users/a19256821/Documents/Home/uwb/UWB-Open-RTLS-Configurator/docs/train_gif.gif)
 
-  ```bash
-  brew install protobuf
-  protoc -I=proto --python_out=proto Settings.proto
-  ```
+##### Generate .py proto files from proto file using Protoc (Mac OS/Linux)
 
-  
+```bash
+brew install protobuf
+protoc -I=proto --python_out=proto Settings.proto
+protoc -I=proto --python_out=proto Monitoring.proto
+```
 
-#### Qt:
+##### Generating python file from Qt form (.ui):
 
-Make python file from .ui Qt form:
+```bash
+pyuic5 ./src/main/resources/ui_qt/mainwindow.ui -o ./src/main/python/designs/mainwindow_ui.py
+```
 
-- Switch to fbsenv
-- `pyuic5 ./src/main/resources/ui_qt/mainwindow.ui -o ./src/main/python/designs/mainwindow_ui.py`
+For all questions, please mail me demianzenkov@gmail.com
 
-#### PyCharm:
-
-- *Settings->Build, Execution, Deployment->Python Debugger:*
-- *Gevent compatible - [True], PyQt compatible- [True, PyQt5]*
